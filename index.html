@@ -173,11 +173,18 @@
     </div>
     <div class="selbar" id="selbar"></div>
     <div class="hint">
-      Clique num piso ou parede à esquerda e depois na tela para posicionar.<br>
-      Selecione um piso para ligar/desligar a parede lateral · paredes da biblioteca giram com R.<br>
-      Edite o tipo de piso para ajustar X início / X fim da parede horizontal · a parede não pode sobrepor a lâmina.<br>
-      Pinch para zoom (multitoque) · duplo-clique no rótulo para editar · scroll = zoom.<br>
-      Atalhos: <b>Ctrl+Z</b> (Desfazer) · <b>Ctrl+C/V</b> (Copiar/Colar).
+      <b>(ESC/V)</b> Mover ou Selecionar<br>
+      <b>(T)</b> Textos<br>
+      <b>(C)</b> Cotas<br>
+      <b>(ESPAÇO)</b> Mover câmera<br>
+      ════════<br>
+      <b>(CTRL/SHIFT+CLICK)</b> Múltipla seleção<br>
+      <b>(D)</b> Duplicar seleção<br>
+      <b>(DEL)</b> Exclui seleção<br>
+      <b>(R)</b> Rotaciona seleção<br>
+      ════════<br>
+      <b>(CTRL+Z)</b> Desfazer<br>
+      <b>(CTRL+Y)</b> Refazer
     </div>
   </div>
 </main>
@@ -2808,7 +2815,7 @@ function renderTabs() {
     b.onclick = () => {
       if (state.activeTab === tab.id) return;
       if (isUsed) {
-        toast("Planta em uso. Limpe a planta (Nova) para trocar de aba.");
+        toastError("Planta em uso. Limpe a planta (Nova) para trocar de aba.");
         return;
       }
       state.activeTab = tab.id;
@@ -3376,7 +3383,7 @@ function placeWallAt(wx,wy){
   const finalInst={wallTypeId:armedWallType,ax,ay,rot:ghostRot};
   if(wallOverlapsAny(finalInst,null)){toast("Não é possível sobrepor paredes.");return;}
   const compatErr=wallPisoCompatError(finalInst);
-  if(compatErr){toast(`⚠️ ${compatErr}.`);return;}
+  if(compatErr){toastError(`${compatErr}.`);return;}
   saveState();
   const inst={id:uid(),wallTypeId:armedWallType,ax,ay,rot:ghostRot};
   state.wallInstances.push(inst);selId=inst.id;
@@ -4461,6 +4468,24 @@ let toastT;function toast(msg){let t=document.getElementById("_toast");
     t.style.cssText="position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1C1F24;color:#fff;padding:9px 16px;border-radius:8px;font-family:'Montserrat',sans-serif;font-size:13px;z-index:99;transition:opacity .3s;box-shadow:var(--shadow);pointer-events:none;";
     document.body.appendChild(t);}
   t.textContent=msg;t.style.opacity="1";clearTimeout(toastT);toastT=setTimeout(()=>t.style.opacity="0",1800);}
+
+let toastErrT;function toastError(msg){
+  let overlay=document.getElementById("_toastErrOverlay");
+  if(!overlay){
+    overlay=document.createElement("div");overlay.id="_toastErrOverlay";
+    overlay.style.cssText="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:200;pointer-events:none;";
+    document.body.appendChild(overlay);
+  }
+  let t=document.getElementById("_toastErr");
+  if(!t){
+    t=document.createElement("div");t.id="_toastErr";
+    t.style.cssText="background:#1C1F24;color:#fff;padding:14px 22px;border-radius:12px;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:600;transition:opacity .35s;box-shadow:0 8px 32px rgba(0,0,0,.35);display:flex;align-items:center;gap:10px;max-width:90vw;text-align:center;opacity:0;";
+    overlay.appendChild(t);
+  }
+  t.innerHTML=`<span style="font-size:20px;flex:none">⚠️</span><span>${msg}</span>`;
+  t.style.opacity="1";
+  clearTimeout(toastErrT);toastErrT=setTimeout(()=>t.style.opacity="0",2600);
+}
 
 document.getElementById("menuToggle").onclick=()=>{
   const aside=document.getElementById("aside");

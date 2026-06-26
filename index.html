@@ -159,6 +159,15 @@
   .sw.on{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
   .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
   .modal .del-link{margin-right:auto;color:var(--over);background:none;border:none;font-size:12.5px;font-family:'Montserrat',sans-serif;font-weight:700}
+  /* ── Accordion sections no modal de tipo ── */
+  .tm-section{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--surface)}
+  .tm-section>summary{cursor:pointer;padding:9px 12px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);user-select:none;list-style:none;display:flex;align-items:center;gap:7px;background:var(--bg)}
+  .tm-section>summary::-webkit-details-marker{display:none}
+  .tm-section>summary::after{content:"▸";margin-left:auto;color:var(--ink-faint);transition:transform .18s}
+  .tm-section[open]>summary{border-bottom:1px solid var(--line)}
+  .tm-section[open]>summary::after{transform:rotate(90deg)}
+  .tm-section>.tm-body{padding:10px 12px 6px}
+  .bom-title{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
   .empty{color:var(--ink-faint);font-size:13px;text-align:center;padding:18px 0;font-weight:600}
   .menu-toggle{display:none}
   @media(max-width:760px){
@@ -375,6 +384,7 @@ let tokenAtivoSessao = ""; // token ativo na sessão atual (independente de loca
 // Estado do modal de quantitativo — persiste entre aberturas na mesma sessão
 let qAjustes = {};             // { nomeProduto: deltaQty }
 let qNovosItens = new Set();   // nomes de produtos adicionados manualmente que não estão no BOM
+let bomClipboard = null;       // clipboard para copiar/colar BOM entre painéis
 const uid=()=>Math.random().toString(36).slice(2,9);
 const fmt=n=>Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const WLAB={none:"—",solid:"sólida",open:"aberturas",window:"janela"};
@@ -4175,142 +4185,171 @@ function openTypeModal(id, forceMez, cloneFrom){
   const titleStr = id ? "Editar piso" : src ? `Duplicar: ${esc(src.name)}` : "Novo tipo de piso";
   
   modalBody.innerHTML=`<h3>${titleStr}</h3>
-    
-    <div class="field"><label>Exibir nas abas:</label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;padding:6px 0;">
-        ${(state.tabs||[{id:'geral',name:'Geral'}]).map(tab => `
-          <label style="display:flex; align-items:center; gap:4px; font-weight:600; text-transform:none; font-size:12px;">
+
+    <!-- Exibir nas abas (sempre visível) -->
+    <div class="field" style="margin-bottom:8px"><label>Exibir nas abas:</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;padding:4px 0;">
+        ${(state.tabs||[{id:'geral',name:'Geral'}]).map(tab=>`
+          <label style="display:flex;align-items:center;gap:4px;font-weight:600;text-transform:none;font-size:12px;">
             <input type="checkbox" class="tab-cb" value="${tab.id}" ${t.tabIds.includes(tab.id)?'checked':''} ${tab.id==='geral'?'disabled checked':''} style="width:auto;margin:0;">
             ${esc(tab.name)}
-          </label>
-        `).join("")}
+          </label>`).join("")}
       </div>
     </div>
 
-    <div class="field"><label>Categoria do piso</label>
-      <div style="display:flex;gap:6px">
-        <button type="button" class="tbtn" id="f_cat_piso" style="flex:1">Piso normal</button>
-        <button type="button" class="tbtn" id="f_cat_mez" style="flex:1">🏗 Mezanino</button>
-      </div>
-    </div>
-
-    <p class="sub" id="f_dims_hint">Dimensões do módulo de piso, em metros.</p>
-    <div class="field"><label>Nome / código</label><input id="f_name" value="${esc(t.name)}" placeholder="ex: Piso 4,5 × 1,5"></div>
-    <div class="two"><div class="field"><label id="f_w_label">Largura (m)</label><input id="f_w" type="number" step="0.01" value="${t.w}"></div>
-      <div class="field"><label id="f_d_label">Comprimento (m)</label><input id="f_d" type="number" step="0.01" value="${t.d}"></div></div>
-    <p class="sub" id="f_mez_hint" style="display:none">Estas medidas são da área marrom claro (a que conta na área ocupada m²). O mezanino ganha automaticamente uma parede de 0,12 m na parte de cima — ex.: comprimento 2,40 m vira 2,52 m de profundidade total.</p>
-
-    <div class="field">
-      <label>Rotação inicial ao posicionar</label>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button type="button" class="tbtn" id="f_rot_btn" style="min-width:110px">↻ <span id="f_rot_val">0°</span></button>
-        <span class="sub" style="margin:0">Toda vez que você for posicionar este piso, ele já começa girado assim.</span>
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Paredes laterais padrão</label>
-      <div class="two">
-        <button type="button" class="tbtn" id="f_dwall_l" style="flex:1">Esq: —</button>
-        <button type="button" class="tbtn" id="f_dwall_r" style="flex:1">Dir: —</button>
-      </div>
-      <p class="sub" style="margin:6px 0 0">Define como as paredes laterais já começam ao posicionar este modelo na planta.</p>
-    </div>
-    <div class="field" style="margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-      <input type="checkbox" id="f_wlock" style="width:auto;margin:0" ${t.lockWalls?"checked":""}> 🔒 Bloquear edição das paredes laterais para este modelo</label></div>
-    
-    <div id="f_color_box" class="field" style="${t.hwall?"display:none":""}">
-      <label>Cor do Piso</label>
-      <div class="swatches" id="f_sw">
-        <div class="sw ${pickedColor===WOOD_L?'on':''}" data-c="${WOOD_L}" style="background:${WOOD_L}" title="Marrom Claro"></div>
-        <div class="sw ${pickedColor===WOOD_D?'on':''}" data-c="${WOOD_D}" style="background:${WOOD_D}" title="Marrom Escuro"></div>
-      </div>
-    </div>
-
-    <div class="field" id="f_hw_row" style="margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-      <input type="checkbox" id="f_hw" style="width:auto;margin:0" ${t.hwall?"checked":""}> Possui parede interna horizontal</label></div>
-    <div id="f_hwbox" style="${t.hwall?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:11px;background:var(--paper)">
-      <div class="two"><div class="field" style="margin-bottom:6px"><label>Espessura (m)</label><input id="f_hth" type="number" step="0.01" value="${t.hwall?t.hwall.th:0.12}"></div>
-        <div class="field" style="margin-bottom:6px"><label>Afast. deck (m)</label><input id="f_hdeck" type="number" step="0.01" value="${t.hwall?t.hwall.deck:0.20}"></div>
-      </div>
-      <p class="sub" style="margin:2px 0 6px;font-size:11px;color:var(--ink-faint)">Extensão horizontal — 0 = borda esquerda do piso.</p>
-      <div class="two">
-        <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_hx0" type="number" step="0.01" min="0" value="${t.hwall?(t.hwall.x0!==undefined?t.hwall.x0:0).toFixed(2):'0.00'}"></div>
-        <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_hx1" type="number" step="0.01" min="0" value="${t.hwall?(t.hwall.x1!==undefined?t.hwall.x1:t.w).toFixed(2):t.w.toFixed(2)}"></div>
-      </div>
-      <div class="field" style="margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-        <input type="checkbox" id="f_twotone" style="width:auto;margin:0" ${(!t.hwall||t.hwall.twoTone!==false)?"checked":""}> Dois tons (marrom claro + escuro)</label></div>
-    </div>
-    <p class="sub" style="margin:2px 0 6px;font-size:11px;color:var(--ink-faint)">Parede lateral — espessura e esquadria fixa.</p>
-    <div class="two">
-      <div class="field" style="margin-bottom:6px"><label>Espessura lateral (m)</label><input id="f_wallthick" type="number" step="0.005" min="0.05" max="0.30" value="${(t.wallThick||0.10).toFixed(3)}"></div>
-      <div class="field" style="margin-bottom:6px">
-        <label style="display:flex;align-items:center;gap:6px">
-          <input type="checkbox" id="f_latesq" style="width:auto;margin:0" ${(t.lateralEsq&&t.lateralEsq.enabled)?"checked":""}> Janela lateral centralizada (45 cm)</label>
-        <div id="f_latesqside" style="${(t.lateralEsq&&t.lateralEsq.enabled)?'display:flex':'display:none'};gap:6px;margin-top:5px;margin-left:20px">
-          <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="esq" ${(t.lateralEsq&&t.lateralEsq.side==='esq')?"checked":""} style="width:auto;margin:0"> Esquerda</label>
-          <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="dir" ${(t.lateralEsq&&t.lateralEsq.side==='dir')?"checked":""} style="width:auto;margin:0"> Direita</label>
-          <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="ambas" ${(!t.lateralEsq||!t.lateralEsq.side||t.lateralEsq.side==='ambas')?"checked":""} style="width:auto;margin:0"> Ambas</label>
+    <!-- Categoria 1: Informações básicas (aberta) -->
+    <details class="tm-section" open>
+      <summary>📐 Informações Básicas</summary>
+      <div class="tm-body">
+        <div class="field"><label>Nome / código</label><input id="f_name" value="${esc(t.name)}" placeholder="ex: Piso 4,5 × 1,5"></div>
+        <div class="field"><label>Categoria do piso</label>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="tbtn" id="f_cat_piso" style="flex:1">Piso normal</button>
+            <button type="button" class="tbtn" id="f_cat_mez" style="flex:1">🏗 Mezanino</button>
+          </div>
+        </div>
+        <p class="sub" id="f_dims_hint" style="margin:4px 0">Dimensões do módulo de piso, em metros.</p>
+        <p class="sub" id="f_mez_hint" style="display:none;margin:4px 0">Medidas da área marrom claro. O mezanino ganha +0,12 m de parede automaticamente.</p>
+        <div class="two">
+          <div class="field"><label id="f_w_label">Largura (m)</label><input id="f_w" type="number" step="0.01" value="${t.w}"></div>
+          <div class="field"><label id="f_d_label">Comprimento (m)</label><input id="f_d" type="number" step="0.01" value="${t.d}"></div>
+        </div>
+        <div id="f_color_box" class="field" style="${t.hwall?"display:none":""}">
+          <label>Cor do Piso</label>
+          <div class="swatches" id="f_sw">
+            <div class="sw ${pickedColor===WOOD_L?'on':''}" data-c="${WOOD_L}" style="background:${WOOD_L}" title="Marrom Claro"></div>
+            <div class="sw ${pickedColor===WOOD_D?'on':''}" data-c="${WOOD_D}" style="background:${WOOD_D}" title="Marrom Escuro"></div>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:4px">
+          <label>Espessura lateral (m)</label>
+          <input id="f_wallthick" type="number" step="0.005" min="0.05" max="0.30" value="${(t.wallThick||0.10).toFixed(3)}">
         </div>
       </div>
-    </div>
+    </details>
 
-    <div id="f_mezbox" style="display:none;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:11px;background:var(--paper)">
-      <span class="lab" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:700">Parede do mezanino · espessura fixa de 0,12 m</span>
-    </div>
+    <!-- Categoria 2: Predefinições de modelo (fechada) -->
+    <details class="tm-section">
+      <summary>⚙ Predefinições de Modelo</summary>
+      <div class="tm-body">
+        <div class="field">
+          <label>Rotação inicial ao posicionar</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button type="button" class="tbtn" id="f_rot_btn" style="min-width:110px">↻ <span id="f_rot_val">0°</span></button>
+            <span class="sub" style="margin:0">Toda vez que você for posicionar este piso, ele já começa girado assim.</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Paredes laterais padrão</label>
+          <div class="two">
+            <button type="button" class="tbtn" id="f_dwall_l" style="flex:1">Esq: —</button>
+            <button type="button" class="tbtn" id="f_dwall_r" style="flex:1">Dir: —</button>
+          </div>
+          <p class="sub" style="margin:6px 0 0">Define como as paredes laterais já começam ao posicionar este modelo.</p>
+        </div>
+        <div class="field" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+          <input type="checkbox" id="f_wlock" style="width:auto;margin:0" ${t.lockWalls?"checked":""}> 🔒 Bloquear edição das paredes laterais para este modelo</label></div>
+      </div>
+    </details>
 
-    <div id="f_esqwrap" style="${t.hwall?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:11px;background:var(--paper)">
-      <label style="display:block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:6px">Esquadrias na parede</label>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px" id="f_esq_qty_row">
-        ${[0,1,2,3,4].map(n=>'<button type="button" class="tbtn" data-n="'+n+'" style="min-width:54px">'+(n===0?"Nenhuma":n)+'</button>').join("")}
-      </div>
-      <div id="f_esq_list"></div>
-    </div>
+    <!-- Categoria 3: Opcionais (fechada) -->
+    <details class="tm-section">
+      <summary>✨ Opcionais</summary>
+      <div class="tm-body">
 
-    <div class="field" id="f_lam_row" style="margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-      <input type="checkbox" id="f_lam" style="width:auto;margin:0" ${t.lamina?"checked":""}> Possui lâmina (quadrado branco)</label></div>
-    <div id="f_lambox" style="${t.lamina?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:11px;background:var(--paper)">
-      <p class="sub" style="margin:0 0 8px;font-size:11px;color:var(--ink-faint)">Coordenadas em metros a partir da borda inferior-esquerda do piso (Y cresce para cima).</p>
-      <div class="two">
-        <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_lx1" type="number" step="0.01" value="${t.lamina?(t.lamina.lx+(t.w/2)).toFixed(3):0}"></div>
-        <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_lx2" type="number" step="0.01" value="${t.lamina?(t.lamina.lx+t.lamina.lw+(t.w/2)).toFixed(3):t.w}"></div>
-      </div>
-      <div class="two">
-        <div class="field" style="margin-bottom:6px"><label>Y início / baixo (m)</label><input id="f_ly1" type="number" step="0.001" value="${t.lamina?(t.d/2-t.lamina.ly-t.lamina.lh).toFixed(3):0}"></div>
-        <div class="field" style="margin-bottom:6px"><label>Y fim / cima (m)</label><input id="f_ly2" type="number" step="0.001" value="${t.lamina?(t.d/2-t.lamina.ly).toFixed(3):t.d}"></div>
-      </div>
-    </div>
-    <div class="field" id="f_rede_row" style="margin-bottom:6px;display:none"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-      <input type="checkbox" id="f_rede_chk" style="width:auto;margin:0" ${t.rede?"checked":""}> ⬚ Possui área de rede / trama</label></div>
-    <div id="f_rede_section" class="rede-section" style="${t.rede?"":"display:none"}">
-      <div class="rede-title">⬚ Área de Rede / Trama</div>
-      <p class="sub" style="margin:0 0 8px;font-size:11px;color:#00695c">Coordenadas em metros a partir da borda esquerda/inferior do piso.</p>
-      <div class="two">
-        <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_rede_x0" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.x0)||0}"></div>
-        <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_rede_x1" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.x1)||0}"></div>
-      </div>
-      <div class="two">
-        <div class="field" style="margin-bottom:6px"><label>Y início / baixo (m)</label><input id="f_rede_y0" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.y0)||0}"></div>
-        <div class="field" style="margin-bottom:6px"><label>Y fim / cima (m)</label><input id="f_rede_y1" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.y1)||0}"></div>
-      </div>
-    </div>
+        <!-- Parede interna horizontal -->
+        <div class="field" id="f_hw_row" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+          <input type="checkbox" id="f_hw" style="width:auto;margin:0" ${t.hwall?"checked":""}> Possui parede interna horizontal</label></div>
+        <div id="f_hwbox" style="${t.hwall?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
+          <div class="two"><div class="field" style="margin-bottom:6px"><label>Espessura (m)</label><input id="f_hth" type="number" step="0.01" value="${t.hwall?t.hwall.th:0.12}"></div>
+            <div class="field" style="margin-bottom:6px"><label>Afast. deck (m)</label><input id="f_hdeck" type="number" step="0.01" value="${t.hwall?t.hwall.deck:0.20}"></div>
+          </div>
+          <p class="sub" style="margin:2px 0 6px;font-size:11px">Extensão horizontal — 0 = borda esquerda.</p>
+          <div class="two">
+            <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_hx0" type="number" step="0.01" min="0" value="${t.hwall?(t.hwall.x0!==undefined?t.hwall.x0:0).toFixed(2):'0.00'}"></div>
+            <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_hx1" type="number" step="0.01" min="0" value="${t.hwall?(t.hwall.x1!==undefined?t.hwall.x1:t.w).toFixed(2):t.w.toFixed(2)}"></div>
+          </div>
+          <div class="field" style="margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+            <input type="checkbox" id="f_twotone" style="width:auto;margin:0" ${(!t.hwall||t.hwall.twoTone!==false)?"checked":""}> Dois tons (marrom claro + escuro)</label></div>
+        </div>
+        <div id="f_mezbox" style="display:none;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:10px;background:var(--paper)">
+          <span class="lab" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:700">Parede do mezanino · espessura fixa de 0,12 m</span>
+        </div>
+        <div id="f_esqwrap" style="${t.hwall?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
+          <label style="display:block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:6px">Esquadrias na parede</label>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px" id="f_esq_qty_row">
+            ${[0,1,2,3,4].map(n=>'<button type="button" class="tbtn" data-n="'+n+'" style="min-width:54px">'+(n===0?"Nenhuma":n)+'</button>').join("")}
+          </div>
+          <div id="f_esq_list"></div>
+        </div>
 
+        <!-- Lâmina -->
+        <div class="field" id="f_lam_row" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+          <input type="checkbox" id="f_lam" style="width:auto;margin:0" ${t.lamina?"checked":""}> Possui lâmina (quadrado branco)</label></div>
+        <div id="f_lambox" style="${t.lamina?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
+          <p class="sub" style="margin:0 0 8px;font-size:11px">Coordenadas a partir da borda inferior-esquerda (Y cresce para cima).</p>
+          <div class="two">
+            <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_lx1" type="number" step="0.01" value="${t.lamina?(t.lamina.lx+(t.w/2)).toFixed(3):0}"></div>
+            <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_lx2" type="number" step="0.01" value="${t.lamina?(t.lamina.lx+t.lamina.lw+(t.w/2)).toFixed(3):t.w}"></div>
+          </div>
+          <div class="two">
+            <div class="field" style="margin-bottom:6px"><label>Y início / baixo (m)</label><input id="f_ly1" type="number" step="0.001" value="${t.lamina?(t.d/2-t.lamina.ly-t.lamina.lh).toFixed(3):0}"></div>
+            <div class="field" style="margin-bottom:6px"><label>Y fim / cima (m)</label><input id="f_ly2" type="number" step="0.001" value="${t.lamina?(t.d/2-t.lamina.ly).toFixed(3):t.d}"></div>
+          </div>
+        </div>
+
+        <!-- Rede -->
+        <div class="field" id="f_rede_row" style="display:none;margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+          <input type="checkbox" id="f_rede_chk" style="width:auto;margin:0" ${t.rede?"checked":""}> ⬚ Possui área de rede / trama</label></div>
+        <div id="f_rede_section" class="rede-section" style="${t.rede?"":"display:none"}">
+          <div class="rede-title">⬚ Área de Rede / Trama</div>
+          <p class="sub" style="margin:0 0 8px;font-size:11px;color:#00695c">Coordenadas a partir da borda esquerda/inferior do piso.</p>
+          <div class="two">
+            <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_rede_x0" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.x0)||0}"></div>
+            <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_rede_x1" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.x1)||0}"></div>
+          </div>
+          <div class="two">
+            <div class="field" style="margin-bottom:6px"><label>Y início / baixo (m)</label><input id="f_rede_y0" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.y0)||0}"></div>
+            <div class="field" style="margin-bottom:6px"><label>Y fim / cima (m)</label><input id="f_rede_y1" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.y1)||0}"></div>
+          </div>
+        </div>
+
+        <!-- Oitão -->
+        <div class="field" id="f_oitao_row" style="display:none;margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+          <input type="checkbox" id="f_oitao_chk" style="width:auto;margin:0" ${t.possuiPossibilidadeOitao?"checked":""}> △ Possui possibilidade de oitão</label></div>
+        <div class="field" id="f_oitao_nome_row" style="${t.possuiPossibilidadeOitao?"":"display:none"};margin-bottom:10px">
+          <label>Nome do Oitão <span style="font-weight:400;color:var(--ink-faint);font-size:11px">(label visual no SVG)</span></label>
+          <input id="f_oitao_nome" value="${esc(t.nomeOitao||"")}" placeholder="Ex: Oitão A-Frame">
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:600;font-size:12px;text-transform:none;color:var(--ink)">
+            <input type="checkbox" id="f_oitao_default" style="width:auto;margin:0" ${t.oitaoDefaultAtivo?"checked":""}> Ativado por padrão ao posicionar
+          </label>
+        </div>
+
+        <!-- Janela lateral centralizada -->
+        <div class="field" style="margin-bottom:4px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;text-transform:none;color:var(--ink)">
+            <input type="checkbox" id="f_latesq" style="width:auto;margin:0" ${(t.lateralEsq&&t.lateralEsq.enabled)?"checked":""}> Possui janela lateral centralizada (45 cm)</label>
+          <div id="f_latesqside" style="${(t.lateralEsq&&t.lateralEsq.enabled)?'display:flex':'display:none'};gap:6px;margin-top:5px;margin-left:20px">
+            <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="esq" ${(t.lateralEsq&&t.lateralEsq.side==='esq')?"checked":""} style="width:auto;margin:0"> Esquerda</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="dir" ${(t.lateralEsq&&t.lateralEsq.side==='dir')?"checked":""} style="width:auto;margin:0"> Direita</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="ambas" ${(!t.lateralEsq||!t.lateralEsq.side||t.lateralEsq.side==='ambas')?"checked":""} style="width:auto;margin:0"> Ambas</label>
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- BOM com copiar/colar -->
     <div class="bom-section">
       <div class="bom-title">📦 Composição Real (BOM)
-        <button type="button" class="tbtn" id="f_bom_add" style="font-size:11px;padding:3px 8px">+ Produto Real</button>
+        <span style="margin-left:auto;display:flex;gap:4px">
+          <button type="button" class="tbtn" id="f_bom_copy" style="font-size:11px;padding:3px 8px" title="Copiar BOM deste painel">📋 Copiar</button>
+          <button type="button" class="tbtn" id="f_bom_paste" style="font-size:11px;padding:3px 8px" title="Colar BOM copiado">📌 Colar</button>
+          <button type="button" class="tbtn" id="f_bom_add" style="font-size:11px;padding:3px 8px">+ Produto</button>
+        </span>
       </div>
       <div id="f_bom_list"></div>
       <p class="sub" style="margin:4px 0 0;font-size:10.5px;color:var(--ink-faint)">Se vazio, o quantitativo usa o nome do painel como produto. Condições lidas no momento do cálculo.</p>
-    </div>
-
-    <div class="field" id="f_oitao_row" style="display:none;margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-      <input type="checkbox" id="f_oitao_chk" style="width:auto;margin:0" ${t.possuiPossibilidadeOitao?"checked":""}> △ Possui possibilidade de oitão</label></div>
-    <div class="field" id="f_oitao_nome_row" style="${t.possuiPossibilidadeOitao?"":"display:none"}">
-      <label>Nome do Oitão <span style="font-weight:400;color:var(--ink-faint);font-size:11px">(label visual no SVG)</span></label>
-      <input id="f_oitao_nome" value="${esc(t.nomeOitao||"")}" placeholder="Ex: Oitão A-Frame">
-      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:600;font-size:12px;text-transform:none;color:var(--ink)">
-        <input type="checkbox" id="f_oitao_default" style="width:auto;margin:0" ${t.oitaoDefaultAtivo?"checked":""}> Ativado por padrão ao posicionar
-      </label>
     </div>
 
     <div class="modal-actions">${id?'<button class="del-link" id="f_del">Excluir tipo</button>':''}
@@ -4439,6 +4478,16 @@ function openTypeModal(id, forceMez, cloneFrom){
     const firstProd=(pricingData?.produtos||[])[0]?.nome||'';
     bomRows.push({produtoNome:firstProd,condicao:'padrao',qty:1});
     renderBomList();
+  };
+  document.getElementById("f_bom_copy").onclick=()=>{
+    bomClipboard=JSON.parse(JSON.stringify(bomRows));
+    toast("BOM copiado! Cole em outro painel.");
+  };
+  document.getElementById("f_bom_paste").onclick=()=>{
+    if(!bomClipboard){toastError("Nenhum BOM copiado ainda.");return;}
+    bomRows=JSON.parse(JSON.stringify(bomClipboard));
+    renderBomList();
+    toast("BOM colado com sucesso.");
   };
 
   let curDefaultRot=t.defaultRot||0;
@@ -5366,8 +5415,8 @@ function gerarRelatorioQuantitativo(panels) {
       ...g,
       temPreco: g.precoFinal !== null && g.precoFinal > 0,
       subtotal: (g.precoFinal || 0) * g.qtd,
-    }))
-    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+    }));
+  // Ordem intencional: herda exatamente a sequência retornada pela planilha via API
 }
 
 // ── Aplica ajustes manuais e novos itens sobre o BOM automático ──────────

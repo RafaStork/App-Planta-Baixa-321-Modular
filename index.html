@@ -113,7 +113,7 @@
   .scrim.show{display:grid}
   .modal{background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);
     width:100%;max-width:400px;padding:20px;max-height:88vh;overflow:auto}
-  .modal.q-wide{max-width:min(96vw,920px);padding:18px 22px;overflow:visible}
+  .modal.q-wide{max-width:min(96vw,920px);padding:18px 22px;overflow:auto}
   /* ── Overlay separado para config de margens (segurança visual) ── */
   #gestorOverlay{position:fixed;inset:0;background:rgba(20,24,30,.60);display:none;place-items:center;z-index:60}
   #gestorOverlay.show{display:grid}
@@ -240,6 +240,15 @@
   .q-total-block{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:2px solid var(--line);margin-top:0;background:var(--paper);border-radius:0 0 10px 10px;flex-shrink:0}
   .q-total-block .q-total-label{font-size:13px;font-weight:700;color:var(--ink-soft)}
   .q-total-block .q-total-val{font-size:20px;font-weight:900;color:var(--accent);font-family:var(--mono)}
+  .q-desconto-block{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);flex-shrink:0;flex-wrap:wrap}
+  .q-desconto-block label{font-size:12px;font-weight:700;color:var(--ink-soft);white-space:nowrap}
+  .q-desconto-block .q-desc-inputs{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+  .q-desconto-block input[type=number]{width:80px;padding:4px 7px;border:1px solid var(--line);border-radius:7px;font-family:var(--mono);font-size:13px;background:var(--surface);color:var(--ink)}
+  .q-desconto-block select{padding:4px 7px;border:1px solid var(--line);border-radius:7px;font-family:'Montserrat',sans-serif;font-size:12px;background:var(--surface);color:var(--ink)}
+  .q-desconto-block .q-desc-val{font-size:13px;font-weight:700;color:#c62828;font-family:var(--mono);white-space:nowrap}
+  .q-final-block{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--accent-soft,#eaf3e7);border-radius:0 0 10px 10px;flex-shrink:0;border-top:2px solid var(--accent)}
+  .q-final-block .q-final-label{font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .q-final-block .q-final-val{font-size:22px;font-weight:900;color:var(--accent);font-family:var(--mono)}
   .ptype .q-price-badge{font-size:10.5px;font-family:var(--mono);color:var(--ink-faint);margin-top:2px}
   .ptype .q-price-badge.has-price{color:#2e7d32;font-weight:700}
   /* ── Rede (crosshatch) no piso ── */
@@ -384,6 +393,7 @@ let tokenAtivoSessao = ""; // token ativo na sessão atual (independente de loca
 // Estado do modal de quantitativo — persiste entre aberturas na mesma sessão
 let qAjustes = {};             // { nomeProduto: deltaQty }
 let qNovosItens = new Set();   // nomes de produtos adicionados manualmente que não estão no BOM
+let qDesconto = { tipo: 'percent', valor: 0 }; // desconto aplicado ao orçamento
 let bomClipboard = null;       // clipboard para copiar/colar BOM entre painéis (piso)
 let wtBomClipboard = null;    // clipboard para copiar/colar BOM entre paredes
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -4671,6 +4681,13 @@ function renderInv(){
       ${priceBadge}
       <div class="budget"><div class="nums"><span>em uso: <b>${used}</b></span></div></div>`;
     if(canPlace) card.addEventListener("click",e=>{if(e.target.dataset.edit||e.target.dataset.dup)return;armPlace(ty.id);});
+    else if(isGeral && !isAdmin()) {
+      // Gestor/Vendedor na aba Geral: intercepta o clique e exibe aviso orientando o usuário
+      card.addEventListener("click", e => {
+        if(e.target.dataset.edit || e.target.dataset.dup) return;
+        toastError("Você precisa escolher a aba de algum modelo para poder continuar.");
+      });
+    }
     if(isAdmin()){
       card.querySelector("[data-edit]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openTypeModal(ty.id));});
       card.querySelector("[data-dup]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openTypeModal(null,false,ty.id));});
@@ -4728,6 +4745,13 @@ function renderInv(){
       <div class="dims">${fmt(info.length)} m · esp. ${fmt(info.thickness)} m${wt.door?" · 🚪 com porta":""}</div>
       <div class="budget"><div class="nums"><span>em uso: <b>${used}</b></span></div></div>`;
     if(canPlace) card.addEventListener("click",e=>{if(e.target.dataset.edit||e.target.dataset.dup)return;armWallPlace(wt.id);});
+    else if(isGeral && !isAdmin()) {
+      // Gestor/Vendedor na aba Geral: intercepta o clique e exibe aviso orientando o usuário
+      card.addEventListener("click", e => {
+        if(e.target.dataset.edit || e.target.dataset.dup) return;
+        toastError("Você precisa escolher a aba de algum modelo para poder continuar.");
+      });
+    }
     if(isAdmin()){
       card.querySelector("[data-edit]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openWallTypeModal(wt.id));});
       card.querySelector("[data-dup]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openWallTypeModal(null,wt.id));});
@@ -6027,12 +6051,13 @@ document.getElementById("fileInput").onchange=e=>{const f=e.target.files[0];if(!
 document.getElementById("btnPdf").onclick=openPdfModal;
 function openPdfModal(){
   const m=state.meta;
+  // Pré-preenche os campos com os dados já salvos em state.meta para persistência
   modalBody.innerHTML=`<h3>Exportar planta em PDF</h3>
-    <div class="field"><label>Nome do cliente</label><input id="m_cli" placeholder="ex: João Silva"></div>
-    <div class="field"><label>Local da obra</label><input id="m_loc" placeholder="ex: Rua das Flores, 123 - Cidade/UF"></div>
-    <div class="field"><label>Projetado por</label><input id="m_proj" placeholder="321 MODULAR"></div>
-    <div class="two"><div class="field"><label>Modelo / Projeto</label><input id="m_mod" placeholder="${esc(state.name||"Planta sem título")}"></div>
-      <div class="field"><label>Revisão</label><input id="m_rev" placeholder="01"></div></div>
+    <div class="field"><label>Nome do cliente</label><input id="m_cli" value="${esc(m.cliente||"")}" placeholder="ex: João Silva"></div>
+    <div class="field"><label>Local da obra</label><input id="m_loc" value="${esc(m.local||"")}" placeholder="ex: Rua das Flores, 123 - Cidade/UF"></div>
+    <div class="field"><label>Projetado por</label><input id="m_proj" value="${esc(m.projetadoPor||"")}" placeholder="321 MODULAR"></div>
+    <div class="two"><div class="field"><label>Modelo / Projeto</label><input id="m_mod" value="${esc(m.modelo||"")}" placeholder="${esc(state.name||"Planta sem título")}"></div>
+      <div class="field"><label>Revisão</label><input id="m_rev" value="${esc(m.revisao||"")}" placeholder="01"></div></div>
 
     <div class="field" style="margin-top:10px;">
       <label>Cotas no PDF</label>
@@ -6041,6 +6066,14 @@ function openPdfModal(){
         <button type="button" class="tbtn" id="m_dim_manual" style="flex:1">Manuais</button>
       </div>
       <p class="sub" style="margin-top:4px">Automáticas: só a cota geral do projeto e a do mezanino. Manuais: as cotas que você criou com a ferramenta de cotas na planta.</p>
+    </div>
+
+    <div class="field" style="margin-top:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="m_incluir_orc" style="width:auto;margin:0;accent-color:#a7c798;width:14px;height:14px">
+        Incluir orçamento (sem preços unitários) na 2ª página
+      </label>
+      <p class="sub" style="margin-top:4px">Adiciona uma página após a planta com a lista de componentes e o valor total do projeto.</p>
     </div>
 
     <div class="modal-actions">
@@ -6058,25 +6091,32 @@ function openPdfModal(){
   document.getElementById("m_dim_manual").onclick=()=>{dimMode="manual";paintDimMode();};
   paintDimMode();
 
+  // Salva os dados em state.meta para que persistam entre aberturas do modal.
+  // Chamada tanto ao gerar/pré-visualizar quanto ao cancelar.
   const updateMeta = () => {
     state.meta={
-        cliente:document.getElementById("m_cli").value.trim()||m.cliente||"",
-        local:document.getElementById("m_loc").value.trim()||m.local||"",
-        projetadoPor:document.getElementById("m_proj").value.trim()||m.projetadoPor||"321 MODULAR",
-        modelo:document.getElementById("m_mod").value.trim()||m.modelo||state.name||"Planta sem título",
-        revisao:document.getElementById("m_rev").value.trim()||m.revisao||"01",
+        cliente:     document.getElementById("m_cli").value.trim(),
+        local:       document.getElementById("m_loc").value.trim(),
+        projetadoPor:document.getElementById("m_proj").value.trim() || "321 MODULAR",
+        modelo:      document.getElementById("m_mod").value.trim() || state.name || "Planta sem título",
+        revisao:     document.getElementById("m_rev").value.trim() || "01",
         logo: DEFAULT_LOGO
     };
   };
 
-  document.getElementById("m_cancel").onclick=closeModal;
+  // Cancelar também salva — assim os dados preenchidos não se perdem
+  document.getElementById("m_cancel").onclick=()=>{ updateMeta(); closeModal(); };
 
   document.getElementById("m_preview").onclick=()=>{
-      updateMeta(); closeModal(); generatePDF('preview', dimMode);
+      updateMeta();
+      const inclOrc = document.getElementById("m_incluir_orc").checked;
+      closeModal(); generatePDF('preview', dimMode, inclOrc);
   };
 
   document.getElementById("m_go").onclick=()=>{
-      updateMeta(); closeModal(); generatePDF('save', dimMode);
+      updateMeta();
+      const inclOrc = document.getElementById("m_incluir_orc").checked;
+      closeModal(); generatePDF('save', dimMode, inclOrc);
   };
 
   scrim.classList.add("show");
@@ -6322,6 +6362,19 @@ function buildSheetSVG(dimMode){
       parts.rects.forEach(rc=>{g+=`<rect x="${X(rc.x)}" y="${Y(rc.y)}" width="${rc.w*mmM}" height="${rc.h*mmM}" fill="${rc.fill}" stroke="#1C1F24" stroke-width="0.15"/>`;});
       g+=pathsToPdfSvg(parts.paths,pdfEsqTexts);
   if(parts.name.show&&parts.name.text)g+=`<text x="${X(parts.name.x)}" y="${Y(parts.name.y)+1.2}" font-family="Montserrat, sans-serif" font-size="3.2" font-weight="bold" fill="#1C1F24" text-anchor="middle">${esc(parts.name.text.toUpperCase())}</text>`;
+    // ── Oitão: seta indicativa + nome no PDF ─────────────────────────────
+    if(p.oitaoAtivo && ty && ty.possuiPossibilidadeOitao){
+      const r=rectOf(p);
+      const wr=internalWallRect(p);
+      const wallY=wr?wr.y:r.y;
+      const ax=X(r.x+r.w/2), ay=Y(wallY);
+      // seta em mm (~2.5 mm base, 2.5 mm altura)
+      const aw=2.5, ah=2.5;
+      g+=`<polygon points="${ax.toFixed(2)},${(ay-ah).toFixed(2)} ${(ax-aw/2).toFixed(2)},${ay.toFixed(2)} ${(ax+aw/2).toFixed(2)},${ay.toFixed(2)}" fill="#1f331b" stroke="#fff" stroke-width="0.15"/>`;
+      if(ty.nomeOitao){
+        g+=`<text x="${(ax+aw/2+0.8).toFixed(2)}" y="${(ay-0.5).toFixed(2)}" font-family="Montserrat, sans-serif" font-size="2.4" font-weight="700" fill="#1f331b">${esc(ty.nomeOitao)}</text>`;
+      }
+    }
   });
   if(dimMode==='auto'){
     // Mezanino dimension: its own pair of cotas, sized to the marrom-claro area only.
@@ -6343,6 +6396,19 @@ function buildSheetSVG(dimMode){
     g+=pathsToPdfSvg(parts.paths,pdfEsqTexts);
   });
   g+=pdfDrawEsqTexts(pdfEsqTexts);
+  // ── Oitão em wallInstances no PDF ──────────────────────────────────────
+  state.wallInstances.forEach(wi=>{
+    if(!wi.oitaoAtivo) return;
+    const wtO=wallTypeOf(wi.wallTypeId);
+    if(!wtO||!wtO.possuiPossibilidadeOitao) return;
+    const a=wallAABB(wi); if(!a) return;
+    const ax=X(a.x+a.w/2), ay=Y(a.y);
+    const aw=2.5, ah=2.5;
+    g+=`<polygon points="${ax.toFixed(2)},${(ay-ah).toFixed(2)} ${(ax-aw/2).toFixed(2)},${ay.toFixed(2)} ${(ax+aw/2).toFixed(2)},${ay.toFixed(2)}" fill="#1f331b" stroke="#fff" stroke-width="0.15"/>`;
+    if(wtO.nomeOitao){
+      g+=`<text x="${(ax+aw/2+0.8).toFixed(2)}" y="${(ay-0.5).toFixed(2)}" font-family="Montserrat, sans-serif" font-size="2.4" font-weight="700" fill="#1f331b">${esc(wtO.nomeOitao)}</text>`;
+    }
+  });
   state.labels.forEach(l=>{g+=`<text x="${X(l.x)}" y="${Y(l.y)}" font-family="Montserrat, sans-serif" font-size="3.4" font-weight="bold" fill="#1C1F24" text-anchor="middle">${esc(l.text.toUpperCase())}</text>`;});
 
   if(dimMode==='manual'){
@@ -6484,7 +6550,118 @@ function injetarAssinaturaPDF(doc) {
   doc.setTextColor(0); doc.setDrawColor(0);
 }
 
-async function generatePDF(action = 'save', dimMode = 'auto'){
+// ── Appends a simplified budget page to an existing jsPDF doc ────────────
+// Called by generatePDF when the user checks "Incluir orçamento" in the modal.
+// Shows component list + total only (no unit prices, as stated in the modal).
+function appendOrcamentoSimplificadoAoPDF(doc) {
+  if (!pricingData) return;
+
+  const brlFmt = v => "R$ " + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const itens  = gerarItensOrcamento();
+  if (!itens.length) return; // nothing to show
+
+  const total  = itens.reduce((s, i) => s + (i.subtotal || 0), 0);
+  const proj   = state.name || "Planta sem título";
+
+  // Recalculate discount (same logic as gerarPDFOrcamento)
+  const descValorAbs = qDesconto.tipo === 'percent'
+    ? total * (qDesconto.valor / 100)
+    : Math.min(qDesconto.valor, total);
+  const valorFinal = Math.max(0, total - descValorAbs);
+  const temDesconto = descValorAbs > 0;
+
+  doc.addPage();
+
+  // ── Faixa de cabeçalho (idêntica ao PDF de orçamento) ────────────────
+  doc.setFillColor(31, 51, 27);
+  doc.rect(0, 0, 210, 8, "F");
+  doc.setFillColor(167, 199, 152);
+  doc.rect(0, 8, 210, 2, "F");
+
+  // Título
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(31, 51, 27);
+  doc.text("LISTA DE COMPONENTES", 14, 22);
+
+  // Informações do projeto
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(32, 32, 32);
+  doc.text(`Projeto: ${proj}`, 14, 30);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Franquia: ${pricingData.franquia}`, 14, 35);
+  doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 14, 40);
+
+  // Linha divisória
+  doc.setDrawColor(208, 226, 200);
+  doc.setLineWidth(0.5);
+  doc.line(14, 44, 196, 44);
+
+  // ── Tabela: componentes + total (sem preços unitários) ───────────────
+  doc.autoTable({
+    startY: 50,
+    head: [["Produto / Componente", "Qtd."]],
+    body: itens.map(it => [
+      it.nome + (it.isAvulso ? ' ★' : ''),
+      String(it.qtdFinal),
+    ]),
+    foot: (() => {
+      if (temDesconto) {
+        const descLabel = qDesconto.tipo === 'percent'
+          ? `DESCONTO (${qDesconto.valor}%)`
+          : 'DESCONTO';
+        return [
+          ["SUBTOTAL",    total > 0 ? brlFmt(total) : "—"],
+          [descLabel,     brlFmt(descValorAbs)],
+          ["TOTAL FINAL", valorFinal > 0 ? brlFmt(valorFinal) : "—"],
+        ];
+      }
+      return [["TOTAL", total > 0 ? brlFmt(total) : "—"]];
+    })(),
+    styles: {
+      fontSize: 9,
+      cellPadding: 4,
+      textColor: [32, 32, 32],
+      lineColor: [208, 226, 200],
+      lineWidth: 0.1
+    },
+    headStyles: {
+      fillColor: [31, 51, 27],
+      textColor: 255,
+      fontStyle: "bold"
+    },
+    alternateRowStyles: {
+      fillColor: [250, 252, 249]
+    },
+    footStyles: {
+      fillColor: [167, 199, 152],
+      textColor: [31, 51, 27],
+      fontStyle: "bold",
+      fontSize: 10
+    },
+    didParseCell: function(data) {
+      if (data.section === 'foot' && temDesconto) {
+        if (data.row.index === 1) {
+          data.cell.styles.fillColor = [180, 30, 30];
+          data.cell.styles.textColor = [255, 255, 255];
+        }
+        if (data.row.index === 2) {
+          data.cell.styles.fillColor = [31, 51, 27];
+          data.cell.styles.textColor = [255, 255, 255];
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize  = 11;
+        }
+      }
+    },
+    columnStyles: {
+      0: { cellWidth: "auto" },
+      1: { halign: "right", minCellWidth: 48 },
+    },
+  });
+}
+
+async function generatePDF(action = 'save', dimMode = 'auto', incluirOrcamento = false){
   toast("Gerando PDF (vetorial)…");
   const svgStr=buildSheetSVG(dimMode);
   const fname=(state.meta.modelo||state.name||"planta").replace(/[^\w\-]+/g,"_");
@@ -6504,6 +6681,7 @@ async function generatePDF(action = 'save', dimMode = 'auto'){
       await doc.svg(svgEl,{x:0,y:0,width:210,height:297});
       document.body.removeChild(svgEl);
       injetarAssinaturaPDF(doc);
+      if (incluirOrcamento) appendOrcamentoSimplificadoAoPDF(doc);
       if (action === 'preview') {
           document.getElementById('previewFrame').src = doc.output('bloburl');
           document.getElementById('previewScrim').classList.add('show');
@@ -6530,6 +6708,7 @@ async function generatePDF(action = 'save', dimMode = 'auto'){
             const doc=new js({orientation:"portrait",unit:"mm",format:"a4"});
             doc.addImage(cv.toDataURL("image/jpeg",0.95),"JPEG",0,0,210,297);
             injetarAssinaturaPDF(doc);
+            if (incluirOrcamento) appendOrcamentoSimplificadoAoPDF(doc);
             if (action === 'preview') {
                 document.getElementById('previewFrame').src = doc.output('bloburl');
                 document.getElementById('previewScrim').classList.add('show');
@@ -6749,13 +6928,18 @@ function gerarRelatorioQuantitativo(panels) {
     }
   });
 
+  const prodList = pricingData?.produtos || [];
   return Object.values(acc)
     .map(g => ({
       ...g,
       temPreco: g.precoFinal !== null && g.precoFinal > 0,
       subtotal: (g.precoFinal || 0) * g.qtd,
-    }));
-  // Ordem intencional: herda exatamente a sequência retornada pela planilha via API
+    }))
+    .sort((a, b) => {
+      const ia = prodList.findIndex(p => p.nome === a.nome);
+      const ib = prodList.findIndex(p => p.nome === b.nome);
+      return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+    });
 }
 
 // ── Aplica ajustes manuais e novos itens sobre o BOM automático ──────────
@@ -6833,9 +7017,37 @@ function abrirQuantitativo() {
   const warn = semPreco.length
     ? `<div class="q-warn">⚠ <b>${semPreco.length}</b> tipo(s) sem preço: ${semPreco.map(i=>`<em>${esc(i.nome)}</em>`).join(', ')}.</div>`
     : '';
-  const totalBlock = valorTotal > 0
-    ? `<div class="q-total-block"><span class="q-total-label">Valor Total</span><span class="q-total-val">R$ ${brlFmt(valorTotal)}</span></div>`
-    : '';
+
+  // ── Bloco de desconto + totais ────────────────────────────
+  const descValorAbs = qDesconto.tipo === 'percent'
+    ? valorTotal * (qDesconto.valor / 100)
+    : Math.min(qDesconto.valor, valorTotal);
+  const valorFinal = Math.max(0, valorTotal - descValorAbs);
+
+  const totalBlock = valorTotal > 0 ? `
+    <div class="q-total-block">
+      <span class="q-total-label">Subtotal</span>
+      <span class="q-total-val">R$ ${brlFmt(valorTotal)}</span>
+    </div>
+    <div class="q-desconto-block">
+      <label>Desconto</label>
+      <div class="q-desc-inputs">
+        <select id="q_desc_tipo" onchange="qAplicarDesconto()">
+          <option value="percent" ${qDesconto.tipo==='percent'?'selected':''}>%</option>
+          <option value="reais"   ${qDesconto.tipo==='reais'  ?'selected':''}>R$</option>
+        </select>
+        <input type="number" id="q_desc_val" min="0" step="0.01"
+          value="${qDesconto.valor > 0 ? qDesconto.valor : ''}"
+          placeholder="0"
+          onblur="qAplicarDesconto()"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+      </div>
+      <span class="q-desc-val">${descValorAbs > 0 ? '− R$ ' + brlFmt(descValorAbs) : '—'}</span>
+    </div>
+    <div class="q-final-block">
+      <span class="q-final-label">Valor Final</span>
+      <span class="q-final-val">R$ ${brlFmt(valorFinal)}</span>
+    </div>` : '';
 
   // Avulso section — botão "Adicionar" com inteiros
   const prodOpts = (pricingData?.produtos||[]).map(p=>`<option value="${esc(p.nome)}">${esc(p.nome)}</option>`).join('');
@@ -6882,11 +7094,11 @@ function abrirQuantitativo() {
         ${warn}${totalBlock}
       ` : `<p style="text-align:center;color:var(--ink-faint);padding:40px 0">Nenhum painel na planta ainda.</p>`}
       ${avulsoSection}
-      <div class="modal-actions">
+      <div class="modal-actions" style="position:sticky;bottom:0;background:var(--surface);padding-top:12px;margin-top:4px;z-index:2">
         ${confBtn}
-        <button class="tbtn" onclick="gerarPDFOrcamento()">⤓ PDF</button>
         <button class="tbtn" onclick="qLimparAjustes()">Limpar ajustes</button>
-        <button class="tbtn" onclick="closeModal()">Fechar</button>
+        <button class="tbtn" onclick="gerarPDFOrcamento()">⤓ PDF</button>
+        <button class="tbtn primary" onclick="closeModal()">Fechar</button>
       </div>
     </div>`;
 
@@ -6901,6 +7113,17 @@ function qAjustarQtd(nome, delta) {
     qNovosItens.delete(nome);
     delete qAjustes[nome];
   }
+  abrirQuantitativo();
+}
+
+// Lê os controles de desconto do modal e actualiza qDesconto,
+// depois re-abre o modal para reflectir o novo valor final.
+function qAplicarDesconto() {
+  const tipoEl = document.getElementById('q_desc_tipo');
+  const valEl  = document.getElementById('q_desc_val');
+  if (!tipoEl || !valEl) return;
+  qDesconto.tipo  = tipoEl.value;
+  qDesconto.valor = Math.max(0, parseFloat(valEl.value) || 0);
   abrirQuantitativo();
 }
 
@@ -6931,6 +7154,7 @@ function qAdicionarAvulso() {
 // Zera todos os ajustes e itens manuais
 function qLimparAjustes() {
   qAjustes = {}; qNovosItens = new Set();
+  qDesconto = { tipo: 'percent', valor: 0 };
   abrirQuantitativo();
 }
 
@@ -7163,6 +7387,13 @@ function gerarPDFOrcamento() {
   const total  = itens.reduce((s,i)=>s+(i.subtotal||0),0);
   const proj   = state.name || "Planta sem título";
 
+  // ── Calcular desconto ──────────────────────────────────────
+  const descValorAbs = qDesconto.tipo === 'percent'
+    ? total * (qDesconto.valor / 100)
+    : Math.min(qDesconto.valor, total);
+  const valorFinal = Math.max(0, total - descValorAbs);
+  const temDesconto = descValorAbs > 0;
+
   // Converter SVG logo para PNG via canvas
   const img = document.getElementById("headerLogo");
   const cv = document.createElement("canvas");
@@ -7211,7 +7442,19 @@ function gerarPDFOrcamento() {
       it.temPreco ? brlFmt(it.precoFinal) : "—",
       it.temPreco ? brlFmt(it.subtotal)   : "—",
     ]),
-    foot: [["", "", "TOTAL", total > 0 ? brlFmt(total) : "—"]],
+    foot: (() => {
+      if (temDesconto) {
+        const descLabel = qDesconto.tipo === 'percent'
+          ? `DESCONTO (${qDesconto.valor}%)`
+          : 'DESCONTO';
+        return [
+          ["", "", "SUBTOTAL",    total > 0 ? brlFmt(total) : "—"],
+          ["", "", descLabel,     brlFmt(descValorAbs)],
+          ["", "", "TOTAL FINAL", valorFinal > 0 ? brlFmt(valorFinal) : "—"],
+        ];
+      }
+      return [["", "", "TOTAL", total > 0 ? brlFmt(total) : "—"]];
+    })(),
     styles: { 
         fontSize: 9, 
         cellPadding: 4, 
@@ -7233,11 +7476,27 @@ function gerarPDFOrcamento() {
         fontStyle: "bold", 
         fontSize: 10 
     },
+    didParseCell: function(data) {
+      if (data.section === 'foot' && temDesconto) {
+        if (data.row.index === 1) {
+          // linha de desconto: fundo vermelho, texto branco, mesma fonte do rodapé
+          data.cell.styles.fillColor  = [180, 30, 30];
+          data.cell.styles.textColor  = [255, 255, 255];
+        }
+        if (data.row.index === 2) {
+          // linha total final: verde escuro com texto branco
+          data.cell.styles.fillColor  = [31, 51, 27];
+          data.cell.styles.textColor  = [255, 255, 255];
+          data.cell.styles.fontStyle  = 'bold';
+          data.cell.styles.fontSize   = 11;
+        }
+      }
+    },
     columnStyles: {
       0: { cellWidth: "auto" },
       1: { halign: "center", cellWidth: 16 },
-      2: { halign: "right",  cellWidth: 34 },
-      3: { halign: "right",  cellWidth: 34 },
+      2: { halign: "right",  minCellWidth: 44 },
+      3: { halign: "right",  minCellWidth: 44 },
     },
   });
 

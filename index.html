@@ -384,7 +384,8 @@ let tokenAtivoSessao = ""; // token ativo na sessão atual (independente de loca
 // Estado do modal de quantitativo — persiste entre aberturas na mesma sessão
 let qAjustes = {};             // { nomeProduto: deltaQty }
 let qNovosItens = new Set();   // nomes de produtos adicionados manualmente que não estão no BOM
-let bomClipboard = null;       // clipboard para copiar/colar BOM entre painéis
+let bomClipboard = null;       // clipboard para copiar/colar BOM entre painéis (piso)
+let wtBomClipboard = null;    // clipboard para copiar/colar BOM entre paredes
 const uid=()=>Math.random().toString(36).slice(2,9);
 const fmt=n=>Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const WLAB={none:"—",solid:"sólida",open:"aberturas",window:"janela"};
@@ -3112,7 +3113,8 @@ function openWallTypeModal(id, cloneFrom){
   const modalTitle=src?`Duplicar: ${esc(src.name)}`:(id?"Editar tipo de parede":"Novo tipo de parede");
   modalBody.innerHTML=`<h3>${modalTitle}</h3>
     
-    <div class="field"><label>Exibir nas abas:</label>
+    <!-- Exibir nas abas (sempre visível no topo) -->
+    <div class="field" style="margin-bottom:8px"><label>Exibir nas abas:</label>
       <div style="display:flex;gap:10px;flex-wrap:wrap;padding:6px 0;">
         ${(state.tabs||[{id:'geral',name:'Geral'}]).map(tab => `
           <label style="display:flex; align-items:center; gap:4px; font-weight:600; text-transform:none; font-size:12px;">
@@ -3123,53 +3125,100 @@ function openWallTypeModal(id, cloneFrom){
       </div>
     </div>
 
-    <p class="sub">A parede sempre começa no ponto que você clicar ao posicioná-la na planta (extremidade esquerda/inferior).</p>
-    <div class="field"><label>Nome / código</label><input id="wt_name" value="${esc(t.name)}" placeholder="ex: Parede Banheiro"></div>
-    <div class="two">
-      <div class="field"><label>Espessura (m)</label><input id="wt_th" type="number" step="0.01" value="${t.thickness}"></div>
-      <div class="field"><label>Comprimento (m)</label><input id="wt_len" type="number" step="0.01" value="${t.length}"></div>
-    </div>
+    <!-- Categoria 1: Informações Básicas -->
+    <details class="tm-section" open>
+      <summary>📐 Informações Básicas</summary>
+      <div class="tm-body">
+        <p class="sub" style="margin:0 0 8px">A parede sempre começa no ponto que você clicar ao posicioná-la na planta (extremidade esquerda/inferior).</p>
+        <div class="field"><label>Nome / código</label><input id="wt_name" value="${esc(t.name)}" placeholder="ex: Parede Banheiro"></div>
+        <div class="two">
+          <div class="field"><label>Espessura (m)</label><input id="wt_th" type="number" step="0.01" value="${t.thickness}"></div>
+          <div class="field"><label>Comprimento (m)</label><input id="wt_len" type="number" step="0.01" value="${t.length}"></div>
+        </div>
+      </div>
+    </details>
 
-    <div class="field">
-      <label>Rotação inicial ao posicionar</label>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button type="button" class="tbtn" id="wt_rot_btn" style="min-width:110px">↻ <span id="wt_rot_val">0°</span></button>
-        <span class="sub" style="margin:0">Toda vez que você for posicionar esta parede, ela já começa girada assim.</span>
-      </div>
-    </div>
+    <!-- Categoria 2: Predefinições do Modelo -->
+    <details class="tm-section">
+      <summary>⚙ Predefinições do Modelo</summary>
+      <div class="tm-body">
+        <div class="field">
+          <label>Rotação inicial ao posicionar</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button type="button" class="tbtn" id="wt_rot_btn" style="min-width:110px">↻ <span id="wt_rot_val">0°</span></button>
+            <span class="sub" style="margin:0">Toda vez que você for posicionar esta parede, ela já começa girada assim.</span>
+          </div>
+        </div>
 
-    <div class="field" style="margin-bottom:4px">
-      <label style="font-weight:600;font-size:13px">Portas</label>
-      <button type="button" class="mini" id="wt_add_door" style="margin-left:8px">+ Adicionar abertura</button>
-    </div>
-    <div id="wt_doors_list"></div>
-    <div class="field" id="wt_flex_row" style="display:none;margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-      <input type="checkbox" id="wt_flex" style="width:auto;margin:0" ${t.doorFlexible?"checked":""}> Liberar escolha de abertura na planta (1ª porta, por instância)</label></div>
-    <div class="field" style="margin-bottom:6px">
-      <label style="font-weight:600;font-size:12px;color:var(--ink)">Bloquear em tipos de piso (vazio = sem bloqueio)</label>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0;max-height:90px;overflow-y:auto">
-        ${state.types.filter(tp=>!isMez(tp)).map(tp=>'<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="wt-piso-cb" value="'+tp.id+'" '+((t.allowedPisoIds||[]).includes(tp.id)?'checked':'')+' style="width:auto;margin:0"> '+esc(tp.name)+'</label>').join('')}
+        <!-- Sub-accordion: Bloquear em tipos de piso -->
+        <details class="tm-section">
+          <summary>🔒 Bloquear em Tipos de Piso</summary>
+          <div class="tm-body">
+            <p class="sub" style="margin:0 0 8px">Vazio = sem bloqueio. Se preenchido, esta parede só pode ser usada junto com os pisos marcados.</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0;max-height:120px;overflow-y:auto">
+              ${state.types.filter(tp=>!isMez(tp)).map(tp=>'<label style="font-size:11px;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" class="wt-piso-cb" value="'+tp.id+'" '+((t.allowedPisoIds||[]).includes(tp.id)?'checked':'')+' style="width:auto;margin:0"> '+esc(tp.name)+'</label>').join('')}
+            </div>
+          </div>
+        </details>
       </div>
-    </div>
-    <div class="bom-section" id="wt_bom_section">
-      <div class="bom-title">📦 Composição Real (BOM)
-        <button type="button" class="tbtn" id="wt_bom_add" style="font-size:11px;padding:3px 8px">+ Produto Real</button>
-      </div>
-      <div id="wt_bom_list"></div>
-      <p class="sub" style="margin:4px 0 0;font-size:10.5px;color:var(--ink-faint)">Condições baseadas na posição da esquadria (dobradiça). Se vazio, o quantitativo usa o nome da parede como produto.</p>
-    </div>
+    </details>
 
-    <div class="field" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-      <input type="checkbox" id="wt_oitao_chk" style="width:auto;margin:0" ${t.possuiPossibilidadeOitao?"checked":""}> △ Possui possibilidade de oitão</label></div>
-    <div id="wt_oitao_nome_row" style="${t.possuiPossibilidadeOitao?"":"display:none"}">
-      <div class="field">
-        <label>Nome do Oitão <span style="font-weight:400;color:var(--ink-faint);font-size:11px">(label visual no SVG)</span></label>
-        <input id="wt_oitao_nome" value="${esc(t.nomeOitao||"")}" placeholder="Ex: Oitão Parede">
-        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:600;font-size:12px;text-transform:none;color:var(--ink)">
-          <input type="checkbox" id="wt_oitao_default" style="width:auto;margin:0" ${t.oitaoDefaultAtivo?"checked":""}> Ativado por padrão ao posicionar
-        </label>
+    <!-- Categoria 3: Opcionais -->
+    <details class="tm-section">
+      <summary>✨ Opcionais</summary>
+      <div class="tm-body">
+
+        <!-- Sub-accordion: Portas -->
+        <details class="tm-section" ${wtDoors.length>0?"open":""}>
+          <summary>🚪 Portas / Aberturas</summary>
+          <div class="tm-body">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span class="sub" style="margin:0">Aberturas cadastradas nesta parede.</span>
+              <button type="button" class="tbtn" id="wt_add_door" style="font-size:11.5px;padding:4px 10px">+ Adicionar abertura</button>
+            </div>
+            <div id="wt_doors_list"></div>
+            <div class="field" id="wt_flex_row" style="display:none;margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+              <input type="checkbox" id="wt_flex" style="width:auto;margin:0" ${t.doorFlexible?"checked":""}> Liberar escolha de abertura na planta (1ª porta, por instância)</label></div>
+          </div>
+        </details>
+
+        <!-- Sub-accordion: Oitão -->
+        <details class="tm-section" ${t.possuiPossibilidadeOitao?"open":""}>
+          <summary>△ Possibilidade de Oitão</summary>
+          <div class="tm-body">
+            <div class="field" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+              <input type="checkbox" id="wt_oitao_chk" style="width:auto;margin:0" ${t.possuiPossibilidadeOitao?"checked":""}> △ Ativar possibilidade de oitão</label></div>
+            <div id="wt_oitao_nome_row" style="${t.possuiPossibilidadeOitao?"":"display:none"}">
+              <div class="field">
+                <label>Nome do Oitão <span style="font-weight:400;color:var(--ink-faint);font-size:11px">(label visual no SVG)</span></label>
+                <input id="wt_oitao_nome" value="${esc(t.nomeOitao||"")}" placeholder="Ex: Oitão Parede">
+                <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:600;font-size:12px;text-transform:none;color:var(--ink)">
+                  <input type="checkbox" id="wt_oitao_default" style="width:auto;margin:0" ${t.oitaoDefaultAtivo?"checked":""}> Ativado por padrão ao posicionar
+                </label>
+              </div>
+            </div>
+          </div>
+        </details>
+
       </div>
-    </div>
+    </details>
+
+    <!-- BOM como accordion colapsado -->
+    <details class="tm-section">
+      <summary><span class="bom-title" style="display:inline-flex;align-items:center;gap:6px;width:100%">📦 Composição Real (BOM)
+        <span style="margin-left:auto;display:flex;gap:4px" onclick="event.stopPropagation()">
+          <button type="button" class="tbtn" id="wt_bom_copy" style="font-size:11px;padding:3px 8px" title="Copiar BOM desta parede">📋 Copiar</button>
+          <button type="button" class="tbtn" id="wt_bom_paste" style="font-size:11px;padding:3px 8px" title="Colar BOM copiado">📌 Colar</button>
+        </span>
+      </span></summary>
+      <div class="tm-body">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+          <button type="button" class="tbtn" id="wt_bom_add" style="font-size:11px;padding:3px 8px">+ Produto Real</button>
+        </div>
+        <div id="wt_bom_list"></div>
+        <p class="sub" style="margin:4px 0 0;font-size:10.5px;color:var(--ink-faint)">Condições baseadas na posição da esquadria (dobradiça). Se vazio, o quantitativo usa o nome da parede como produto.</p>
+      </div>
+    </details>
 
     <div class="modal-actions">${id?'<button class="del-link" id="wt_del">Excluir tipo</button>':''}
       <button class="tbtn" id="wt_cancel">Cancelar</button><button class="tbtn primary" id="wt_save">Salvar</button></div>`;
@@ -3219,6 +3268,16 @@ function openWallTypeModal(id, cloneFrom){
     const firstProd = (pricingData?.produtos||[])[0]?.nome || '';
     wtBomRows.push({produtoNome: firstProd, condicao: 'padrao', qty: 1});
     renderWtBomList();
+  };
+  document.getElementById("wt_bom_copy").onclick = () => {
+    wtBomClipboard = JSON.parse(JSON.stringify(wtBomRows));
+    toast("BOM da parede copiado! Cole em outra parede.");
+  };
+  document.getElementById("wt_bom_paste").onclick = () => {
+    if(!wtBomClipboard){toastError("Nenhum BOM de parede copiado ainda.");return;}
+    wtBomRows = JSON.parse(JSON.stringify(wtBomClipboard));
+    renderWtBomList();
+    toast("BOM colado com sucesso.");
   };
 
   let curDefaultRot=t.defaultRot||0;
@@ -4257,100 +4316,128 @@ function openTypeModal(id, forceMez, cloneFrom){
       <summary>✨ Opcionais</summary>
       <div class="tm-body">
 
-        <!-- Parede interna horizontal -->
-        <div class="field" id="f_hw_row" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-          <input type="checkbox" id="f_hw" style="width:auto;margin:0" ${t.hwall?"checked":""}> Possui parede interna horizontal</label></div>
-        <div id="f_hwbox" style="${t.hwall?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
-          <div class="two"><div class="field" style="margin-bottom:6px"><label>Espessura (m)</label><input id="f_hth" type="number" step="0.01" value="${t.hwall?t.hwall.th:0.12}"></div>
-            <div class="field" style="margin-bottom:6px"><label>Afast. deck (m)</label><input id="f_hdeck" type="number" step="0.01" value="${t.hwall?t.hwall.deck:0.20}"></div>
+        <!-- Sub-accordion: Parede interna horizontal -->
+        <details class="tm-section" id="f_hw_section" ${t.hwall?"open":""}>
+          <summary>🧱 Parede interna horizontal</summary>
+          <div class="tm-body">
+            <div class="field" id="f_hw_row" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+              <input type="checkbox" id="f_hw" style="width:auto;margin:0" ${t.hwall?"checked":""}> Ativar parede interna horizontal</label></div>
+            <div id="f_hwbox" style="${t.hwall?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
+              <div class="two"><div class="field" style="margin-bottom:6px"><label>Espessura (m)</label><input id="f_hth" type="number" step="0.01" value="${t.hwall?t.hwall.th:0.12}"></div>
+                <div class="field" style="margin-bottom:6px"><label>Afast. deck (m)</label><input id="f_hdeck" type="number" step="0.01" value="${t.hwall?t.hwall.deck:0.20}"></div>
+              </div>
+              <p class="sub" style="margin:2px 0 6px;font-size:11px">Extensão horizontal — 0 = borda esquerda.</p>
+              <div class="two">
+                <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_hx0" type="number" step="0.01" min="0" value="${t.hwall?(t.hwall.x0!==undefined?t.hwall.x0:0).toFixed(2):'0.00'}"></div>
+                <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_hx1" type="number" step="0.01" min="0" value="${t.hwall?(t.hwall.x1!==undefined?t.hwall.x1:t.w).toFixed(2):t.w.toFixed(2)}"></div>
+              </div>
+              <div class="field" style="margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+                <input type="checkbox" id="f_twotone" style="width:auto;margin:0" ${(!t.hwall||t.hwall.twoTone!==false)?"checked":""}> Dois tons (marrom claro + escuro)</label></div>
+            </div>
+            <div id="f_mezbox" style="display:none;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:10px;background:var(--paper)">
+              <span class="lab" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:700">Parede do mezanino · espessura fixa de 0,12 m</span>
+            </div>
+            <div id="f_esqwrap" style="${t.hwall?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
+              <label style="display:block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:6px">Esquadrias na parede</label>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px" id="f_esq_qty_row">
+                ${[0,1,2,3,4].map(n=>'<button type="button" class="tbtn" data-n="'+n+'" style="min-width:54px">'+(n===0?"Nenhuma":n)+'</button>').join("")}
+              </div>
+              <div id="f_esq_list"></div>
+            </div>
           </div>
-          <p class="sub" style="margin:2px 0 6px;font-size:11px">Extensão horizontal — 0 = borda esquerda.</p>
-          <div class="two">
-            <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_hx0" type="number" step="0.01" min="0" value="${t.hwall?(t.hwall.x0!==undefined?t.hwall.x0:0).toFixed(2):'0.00'}"></div>
-            <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_hx1" type="number" step="0.01" min="0" value="${t.hwall?(t.hwall.x1!==undefined?t.hwall.x1:t.w).toFixed(2):t.w.toFixed(2)}"></div>
-          </div>
-          <div class="field" style="margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-            <input type="checkbox" id="f_twotone" style="width:auto;margin:0" ${(!t.hwall||t.hwall.twoTone!==false)?"checked":""}> Dois tons (marrom claro + escuro)</label></div>
-        </div>
-        <div id="f_mezbox" style="display:none;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:10px;background:var(--paper)">
-          <span class="lab" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:700">Parede do mezanino · espessura fixa de 0,12 m</span>
-        </div>
-        <div id="f_esqwrap" style="${t.hwall?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
-          <label style="display:block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:6px">Esquadrias na parede</label>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px" id="f_esq_qty_row">
-            ${[0,1,2,3,4].map(n=>'<button type="button" class="tbtn" data-n="'+n+'" style="min-width:54px">'+(n===0?"Nenhuma":n)+'</button>').join("")}
-          </div>
-          <div id="f_esq_list"></div>
-        </div>
+        </details>
 
-        <!-- Lâmina -->
-        <div class="field" id="f_lam_row" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-          <input type="checkbox" id="f_lam" style="width:auto;margin:0" ${t.lamina?"checked":""}> Possui lâmina (quadrado branco)</label></div>
-        <div id="f_lambox" style="${t.lamina?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
-          <p class="sub" style="margin:0 0 8px;font-size:11px">Coordenadas a partir da borda inferior-esquerda (Y cresce para cima).</p>
-          <div class="two">
-            <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_lx1" type="number" step="0.01" value="${t.lamina?(t.lamina.lx+(t.w/2)).toFixed(3):0}"></div>
-            <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_lx2" type="number" step="0.01" value="${t.lamina?(t.lamina.lx+t.lamina.lw+(t.w/2)).toFixed(3):t.w}"></div>
+        <!-- Sub-accordion: Lâmina -->
+        <details class="tm-section" id="f_lam_section" ${t.lamina?"open":""}>
+          <summary>⬜ Lâmina (quadrado branco)</summary>
+          <div class="tm-body">
+            <div class="field" id="f_lam_row" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+              <input type="checkbox" id="f_lam" style="width:auto;margin:0" ${t.lamina?"checked":""}> Ativar lâmina</label></div>
+            <div id="f_lambox" style="${t.lamina?"":"display:none"};border:1px solid var(--line);border-radius:8px;padding:8px 10px 2px;margin-bottom:10px;background:var(--paper)">
+              <p class="sub" style="margin:0 0 8px;font-size:11px">Coordenadas a partir da borda inferior-esquerda (Y cresce para cima).</p>
+              <div class="two">
+                <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_lx1" type="number" step="0.01" value="${t.lamina?(t.lamina.lx+(t.w/2)).toFixed(3):0}"></div>
+                <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_lx2" type="number" step="0.01" value="${t.lamina?(t.lamina.lx+t.lamina.lw+(t.w/2)).toFixed(3):t.w}"></div>
+              </div>
+              <div class="two">
+                <div class="field" style="margin-bottom:6px"><label>Y início / baixo (m)</label><input id="f_ly1" type="number" step="0.001" value="${t.lamina?(t.d/2-t.lamina.ly-t.lamina.lh).toFixed(3):0}"></div>
+                <div class="field" style="margin-bottom:6px"><label>Y fim / cima (m)</label><input id="f_ly2" type="number" step="0.001" value="${t.lamina?(t.d/2-t.lamina.ly).toFixed(3):t.d}"></div>
+              </div>
+            </div>
           </div>
-          <div class="two">
-            <div class="field" style="margin-bottom:6px"><label>Y início / baixo (m)</label><input id="f_ly1" type="number" step="0.001" value="${t.lamina?(t.d/2-t.lamina.ly-t.lamina.lh).toFixed(3):0}"></div>
-            <div class="field" style="margin-bottom:6px"><label>Y fim / cima (m)</label><input id="f_ly2" type="number" step="0.001" value="${t.lamina?(t.d/2-t.lamina.ly).toFixed(3):t.d}"></div>
-          </div>
-        </div>
+        </details>
 
-        <!-- Rede -->
-        <div class="field" id="f_rede_row" style="display:none;margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-          <input type="checkbox" id="f_rede_chk" style="width:auto;margin:0" ${t.rede?"checked":""}> ⬚ Possui área de rede / trama</label></div>
-        <div id="f_rede_section" class="rede-section" style="${t.rede?"":"display:none"}">
-          <div class="rede-title">⬚ Área de Rede / Trama</div>
-          <p class="sub" style="margin:0 0 8px;font-size:11px;color:#00695c">Coordenadas a partir da borda esquerda/inferior do piso.</p>
-          <div class="two">
-            <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_rede_x0" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.x0)||0}"></div>
-            <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_rede_x1" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.x1)||0}"></div>
+        <!-- Sub-accordion: Rede -->
+        <details class="tm-section" id="f_rede_section_wrap" style="display:none" ${t.rede?"open":""}>
+          <summary>⬚ Área de Rede / Trama</summary>
+          <div class="tm-body">
+            <div class="field" id="f_rede_row" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+              <input type="checkbox" id="f_rede_chk" style="width:auto;margin:0" ${t.rede?"checked":""}> ⬚ Ativar área de rede / trama</label></div>
+            <div id="f_rede_section" class="rede-section" style="${t.rede?"":"display:none"}">
+              <p class="sub" style="margin:0 0 8px;font-size:11px;color:#00695c">Coordenadas a partir da borda esquerda/inferior do piso.</p>
+              <div class="two">
+                <div class="field" style="margin-bottom:6px"><label>X início (m)</label><input id="f_rede_x0" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.x0)||0}"></div>
+                <div class="field" style="margin-bottom:6px"><label>X fim (m)</label><input id="f_rede_x1" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.x1)||0}"></div>
+              </div>
+              <div class="two">
+                <div class="field" style="margin-bottom:6px"><label>Y início / baixo (m)</label><input id="f_rede_y0" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.y0)||0}"></div>
+                <div class="field" style="margin-bottom:6px"><label>Y fim / cima (m)</label><input id="f_rede_y1" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.y1)||0}"></div>
+              </div>
+            </div>
           </div>
-          <div class="two">
-            <div class="field" style="margin-bottom:6px"><label>Y início / baixo (m)</label><input id="f_rede_y0" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.y0)||0}"></div>
-            <div class="field" style="margin-bottom:6px"><label>Y fim / cima (m)</label><input id="f_rede_y1" type="number" step="0.01" min="0" value="${(t.rede&&t.rede.y1)||0}"></div>
-          </div>
-        </div>
+        </details>
 
-        <!-- Oitão -->
-        <div class="field" id="f_oitao_row" style="display:none;margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
-          <input type="checkbox" id="f_oitao_chk" style="width:auto;margin:0" ${t.possuiPossibilidadeOitao?"checked":""}> △ Possui possibilidade de oitão</label></div>
-        <div class="field" id="f_oitao_nome_row" style="${t.possuiPossibilidadeOitao?"":"display:none"};margin-bottom:10px">
-          <label>Nome do Oitão <span style="font-weight:400;color:var(--ink-faint);font-size:11px">(label visual no SVG)</span></label>
-          <input id="f_oitao_nome" value="${esc(t.nomeOitao||"")}" placeholder="Ex: Oitão A-Frame">
-          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:600;font-size:12px;text-transform:none;color:var(--ink)">
-            <input type="checkbox" id="f_oitao_default" style="width:auto;margin:0" ${t.oitaoDefaultAtivo?"checked":""}> Ativado por padrão ao posicionar
-          </label>
-        </div>
-
-        <!-- Janela lateral centralizada -->
-        <div class="field" style="margin-bottom:4px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;text-transform:none;color:var(--ink)">
-            <input type="checkbox" id="f_latesq" style="width:auto;margin:0" ${(t.lateralEsq&&t.lateralEsq.enabled)?"checked":""}> Possui janela lateral centralizada (45 cm)</label>
-          <div id="f_latesqside" style="${(t.lateralEsq&&t.lateralEsq.enabled)?'display:flex':'display:none'};gap:6px;margin-top:5px;margin-left:20px">
-            <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="esq" ${(t.lateralEsq&&t.lateralEsq.side==='esq')?"checked":""} style="width:auto;margin:0"> Esquerda</label>
-            <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="dir" ${(t.lateralEsq&&t.lateralEsq.side==='dir')?"checked":""} style="width:auto;margin:0"> Direita</label>
-            <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="ambas" ${(!t.lateralEsq||!t.lateralEsq.side||t.lateralEsq.side==='ambas')?"checked":""} style="width:auto;margin:0"> Ambas</label>
+        <!-- Sub-accordion: Oitão -->
+        <details class="tm-section" id="f_oitao_section" style="display:none" ${t.possuiPossibilidadeOitao?"open":""}>
+          <summary>△ Possibilidade de Oitão</summary>
+          <div class="tm-body">
+            <div class="field" id="f_oitao_row" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+              <input type="checkbox" id="f_oitao_chk" style="width:auto;margin:0" ${t.possuiPossibilidadeOitao?"checked":""}> △ Ativar possibilidade de oitão</label></div>
+            <div class="field" id="f_oitao_nome_row" style="${t.possuiPossibilidadeOitao?"":"display:none"};margin-bottom:10px">
+              <label>Nome do Oitão <span style="font-weight:400;color:var(--ink-faint);font-size:11px">(label visual no SVG)</span></label>
+              <input id="f_oitao_nome" value="${esc(t.nomeOitao||"")}" placeholder="Ex: Oitão A-Frame">
+              <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:600;font-size:12px;text-transform:none;color:var(--ink)">
+                <input type="checkbox" id="f_oitao_default" style="width:auto;margin:0" ${t.oitaoDefaultAtivo?"checked":""}> Ativado por padrão ao posicionar
+              </label>
+            </div>
           </div>
-        </div>
+        </details>
+
+        <!-- Sub-accordion: Janela lateral centralizada -->
+        <details class="tm-section" ${(t.lateralEsq&&t.lateralEsq.enabled)?"open":""}>
+          <summary>🪟 Janela Lateral Centralizada (45 cm)</summary>
+          <div class="tm-body">
+            <div class="field" style="margin-bottom:4px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;text-transform:none;color:var(--ink)">
+                <input type="checkbox" id="f_latesq" style="width:auto;margin:0" ${(t.lateralEsq&&t.lateralEsq.enabled)?"checked":""}> Ativar janela lateral centralizada</label>
+              <div id="f_latesqside" style="${(t.lateralEsq&&t.lateralEsq.enabled)?'display:flex':'display:none'};gap:6px;margin-top:5px;margin-left:20px">
+                <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="esq" ${(t.lateralEsq&&t.lateralEsq.side==='esq')?"checked":""} style="width:auto;margin:0"> Esquerda</label>
+                <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="dir" ${(t.lateralEsq&&t.lateralEsq.side==='dir')?"checked":""} style="width:auto;margin:0"> Direita</label>
+                <label style="font-size:12px;display:flex;align-items:center;gap:3px"><input type="radio" name="latesqside" value="ambas" ${(!t.lateralEsq||!t.lateralEsq.side||t.lateralEsq.side==='ambas')?"checked":""} style="width:auto;margin:0"> Ambas</label>
+              </div>
+            </div>
+          </div>
+        </details>
 
       </div>
     </details>
 
-    <!-- BOM com copiar/colar -->
-    <div class="bom-section">
-      <div class="bom-title">📦 Composição Real (BOM)
-        <span style="margin-left:auto;display:flex;gap:4px">
+    <!-- BOM como accordion colapsado -->
+    <details class="tm-section">
+      <summary><span class="bom-title" style="display:inline-flex;align-items:center;gap:6px;width:100%">📦 Composição Real (BOM)
+        <span style="margin-left:auto;display:flex;gap:4px" onclick="event.stopPropagation()">
           <button type="button" class="tbtn" id="f_bom_copy" style="font-size:11px;padding:3px 8px" title="Copiar BOM deste painel">📋 Copiar</button>
           <button type="button" class="tbtn" id="f_bom_paste" style="font-size:11px;padding:3px 8px" title="Colar BOM copiado">📌 Colar</button>
-          <button type="button" class="tbtn" id="f_bom_add" style="font-size:11px;padding:3px 8px">+ Produto</button>
         </span>
+      </span></summary>
+      <div class="tm-body">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+          <button type="button" class="tbtn" id="f_bom_add" style="font-size:11px;padding:3px 8px">+ Produto</button>
+        </div>
+        <div id="f_bom_list"></div>
+        <p class="sub" style="margin:4px 0 0;font-size:10.5px;color:var(--ink-faint)">Se vazio, o quantitativo usa o nome do painel como produto. Condições lidas no momento do cálculo.</p>
       </div>
-      <div id="f_bom_list"></div>
-      <p class="sub" style="margin:4px 0 0;font-size:10.5px;color:var(--ink-faint)">Se vazio, o quantitativo usa o nome do painel como produto. Condições lidas no momento do cálculo.</p>
-    </div>
+    </details>
 
     <div class="modal-actions">${id?'<button class="del-link" id="f_del">Excluir tipo</button>':''}
       <button class="tbtn" id="f_cancel">Cancelar</button><button class="tbtn primary" id="f_save">Salvar</button></div>`;
@@ -4370,11 +4457,13 @@ function openTypeModal(id, forceMez, cloneFrom){
     document.getElementById("f_dims_hint").style.display = mez ? "none" : "";
     document.getElementById("f_mez_hint").style.display = mez ? "" : "none";
     document.getElementById("f_color_box").style.display = mez ? "none" : (hwChk.checked?"none":"");
-    document.getElementById("f_hw_row").style.display = mez ? "none" : "";
+    const hwSec=document.getElementById("f_hw_section");
+    if(hwSec) hwSec.style.display = mez ? "none" : "";
     document.getElementById("f_hwbox").style.display = (!mez && hwChk.checked) ? "" : "none";
     document.getElementById("f_mezbox").style.display = mez ? "" : "none";
     document.getElementById("f_esqwrap").style.display = (mez || hwChk.checked) ? "" : "none";
-    document.getElementById("f_lam_row").style.display = mez ? "none" : "";
+    const lamSec=document.getElementById("f_lam_section");
+    if(lamSec) lamSec.style.display = mez ? "none" : "";
     document.getElementById("f_lambox").style.display = (!mez && document.getElementById("f_lam").checked) ? "" : "none";
   };
   document.getElementById("f_cat_piso").onclick=()=>{typeModalCategory='piso';paintCategory();};
@@ -4383,10 +4472,10 @@ function openTypeModal(id, forceMez, cloneFrom){
   // Rede section: só para piso, com colapso por checkbox
   const updateRedeVis=()=>{
     const isPiso=typeModalCategory==='piso';
-    const row=document.getElementById("f_rede_row");
+    const wrap=document.getElementById("f_rede_section_wrap");
     const sec=document.getElementById("f_rede_section");
     const chk=document.getElementById("f_rede_chk");
-    if(row) row.style.display=isPiso?"":"none";
+    if(wrap) wrap.style.display=isPiso?"":"none";
     if(sec) sec.style.display=(isPiso&&chk&&chk.checked)?"":"none";
   };
   document.getElementById("f_cat_piso").onclick=()=>{typeModalCategory='piso';paintCategory();updateRedeVis();};
@@ -4399,10 +4488,10 @@ function openTypeModal(id, forceMez, cloneFrom){
   // Oitão: visível apenas para piso; nome só aparece quando checkbox marcado
   const updateOitaoVis=()=>{
     const isPiso=typeModalCategory==='piso';
-    const oRow=document.getElementById("f_oitao_row");
+    const oSection=document.getElementById("f_oitao_section");
     const oNome=document.getElementById("f_oitao_nome_row");
     const oChk=document.getElementById("f_oitao_chk");
-    if(oRow) oRow.style.display=isPiso?"":"none";
+    if(oSection) oSection.style.display=isPiso?"":"none";
     if(oNome) oNome.style.display=(isPiso&&oChk?.checked)?"":"none";
   };
   document.getElementById("f_oitao_chk")?.addEventListener("change",updateOitaoVis);

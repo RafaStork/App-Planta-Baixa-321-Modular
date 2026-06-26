@@ -2655,6 +2655,32 @@ function render(){
         grp.appendChild(trama);
       }
     }
+    // ── Oitão: seta indicativa + nome (instâncias com oitaoAtivo) ─────────
+    if(p.oitaoAtivo&&tyR&&tyR.possuiPossibilidadeOitao){
+      const r=rectOf(p);
+      // Base da seta: linha exata da parede horizontal (internalWallRect) ou topo do painel
+      const wr=internalWallRect(p);
+      const wallY=wr?wr.y:r.y;  // topo exterior do hwall em coordenadas mundo
+      const [ax,ay]=toScreen(r.x+r.w/2, wallY);
+      const aw=10, ah=10;
+      // Triângulo com base exatamente na linha do hwall, ponta apontando para fora
+      const arrow=el("polygon",{
+        points:`${ax},${ay-ah} ${ax-aw/2},${ay} ${ax+aw/2},${ay}`,
+        fill:"#1f331b", stroke:"#fff", "stroke-width":"0.8",
+        "vector-effect":"non-scaling-stroke", style:"pointer-events:none"
+      });
+      grp.appendChild(arrow);
+      if(tyR.nomeOitao){
+        const ot=el("text",{
+          x:ax+aw/2+4, y:ay-3,
+          fill:"#1f331b", "font-family":"'Montserrat',sans-serif",
+          "font-size":"9", "font-weight":"700",
+          style:"pointer-events:none"
+        });
+        ot.textContent=tyR.nomeOitao;
+        grp.appendChild(ot);
+      }
+    }
     if(parts.name.show&&parts.name.text){const[nx,ny]=toScreen(parts.name.x,parts.name.y);
       const ng=el("g",{"data-name":p.id,style:"cursor:move"});
       const tw=Math.max(parts.name.text.length*7.5+16,30);
@@ -2790,6 +2816,30 @@ function render(){
       "vector-effect":"non-scaling-stroke",
       style:"pointer-events:none"}));
   }
+  // ── Oitão em wallInstances ────────────────────────────────────────────
+  state.wallInstances.forEach(wi=>{
+    if(!wi.oitaoAtivo) return;
+    const wtO=wallTypeOf(wi.wallTypeId);
+    if(!wtO||!wtO.possuiPossibilidadeOitao) return;
+    const a=wallAABB(wi); if(!a) return;
+    const [sx,sy]=toScreen(a.x+a.w/2, a.y); // topo do bounding box da parede
+    const aw=10,ah=10;
+    const arrowW=el("polygon",{
+      points:`${sx},${sy-ah} ${sx-aw/2},${sy} ${sx+aw/2},${sy}`,
+      fill:"#1f331b", stroke:"#fff","stroke-width":"0.8",
+      "vector-effect":"non-scaling-stroke",style:"pointer-events:none"
+    });
+    svg.appendChild(arrowW);
+    if(wtO.nomeOitao){
+      const otW=el("text",{
+        x:sx+aw/2+4,y:sy-3,fill:"#1f331b",
+        "font-family":"'Montserrat',sans-serif","font-size":"9","font-weight":"700",
+        style:"pointer-events:none"
+      });
+      otW.textContent=wtO.nomeOitao;
+      svg.appendChild(otW);
+    }
+  });
   updateHud();
 }
 function updateHud(){
@@ -2874,6 +2924,16 @@ function renderSelbar(){
       bar.querySelector("#wHgEsq").onclick=()=>setDoor(curOpens,"esquerda");
       bar.querySelector("#wHgDir").onclick=()=>setDoor(curOpens,"direita");
     }
+    // Oitão para parede
+    if(wt&&wt.possuiPossibilidadeOitao){
+      const oSep=document.createElement("span");oSep.className="sep";bar.appendChild(oSep);
+      const oLab=document.createElement("span");oLab.className="lab";oLab.textContent="oitão";bar.appendChild(oLab);
+      const oBtn=document.createElement("button");
+      oBtn.className=wi.oitaoAtivo?"on":"";
+      oBtn.textContent=wi.oitaoAtivo?"▲ Ativado":"△ Ativar";
+      oBtn.onclick=()=>{saveState();wi.oitaoAtivo=!wi.oitaoAtivo;render();renderSelbar();};
+      bar.appendChild(oBtn);
+    }
     return;
   }
   if(!p){bar.classList.remove("show");bar.innerHTML="";return;}
@@ -2927,6 +2987,28 @@ function renderSelbar(){
   bar.querySelector("#sRotate").onclick=rotateSel;
   bar.querySelector("#sDup").onclick=dupSel;
   bar.querySelector("#sDel").onclick=delSel;
+
+  // ── Esquadrias do hwall (replicando lógica das paredes) ────────────────
+  const hEsqs=(pty&&pty.hwall&&pty.hwall.esquadrias)||[];
+  if(hEsqs.length>0){
+    const esqSpan=document.createElement("span");
+    esqSpan.className="lab";
+    esqSpan.style.cssText="margin-left:4px;color:rgba(255,255,255,.5);font-size:10.5px";
+    esqSpan.textContent="esq.: "+hEsqs.map(e=>e.name||e.type||"—").join(" · ");
+    bar.appendChild(esqSpan);
+  }
+
+  // ── Oitão: toggle se o tipo possui essa possibilidade ─────────────────
+  if(pty&&pty.possuiPossibilidadeOitao){
+    const sep=document.createElement("span");sep.className="sep";bar.appendChild(sep);
+    const oLab=document.createElement("span");oLab.className="lab";oLab.textContent="oitão";bar.appendChild(oLab);
+    const oBtn=document.createElement("button");
+    oBtn.id="oitaoToggle";
+    oBtn.className=p.oitaoAtivo?"on":"";
+    oBtn.textContent=p.oitaoAtivo?"▲ Ativado":"△ Ativar";
+    oBtn.onclick=()=>{saveState();p.oitaoAtivo=!p.oitaoAtivo;render();renderSelbar();};
+    bar.appendChild(oBtn);
+  }
 }
 
 function renameSel(){const p=state.panels.find(p=>p.id===selId);if(!p)return;
@@ -3067,6 +3149,18 @@ function openWallTypeModal(id, cloneFrom){
       <p class="sub" style="margin:4px 0 0;font-size:10.5px;color:var(--ink-faint)">Condições baseadas na posição da esquadria (dobradiça). Se vazio, o quantitativo usa o nome da parede como produto.</p>
     </div>
 
+    <div class="field" style="margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+      <input type="checkbox" id="wt_oitao_chk" style="width:auto;margin:0" ${t.possuiPossibilidadeOitao?"checked":""}> △ Possui possibilidade de oitão</label></div>
+    <div id="wt_oitao_nome_row" style="${t.possuiPossibilidadeOitao?"":"display:none"}">
+      <div class="field">
+        <label>Nome do Oitão <span style="font-weight:400;color:var(--ink-faint);font-size:11px">(label visual no SVG)</span></label>
+        <input id="wt_oitao_nome" value="${esc(t.nomeOitao||"")}" placeholder="Ex: Oitão Parede">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:600;font-size:12px;text-transform:none;color:var(--ink)">
+          <input type="checkbox" id="wt_oitao_default" style="width:auto;margin:0" ${t.oitaoDefaultAtivo?"checked":""}> Ativado por padrão ao posicionar
+        </label>
+      </div>
+    </div>
+
     <div class="modal-actions">${id?'<button class="del-link" id="wt_del">Excluir tipo</button>':''}
       <button class="tbtn" id="wt_cancel">Cancelar</button><button class="tbtn primary" id="wt_save">Salvar</button></div>`;
 
@@ -3084,6 +3178,7 @@ function openWallTypeModal(id, cloneFrom){
     {v:"padrao",            l:"Padrão / Sempre"},
     {v:"esq_esquadria_esq", l:"Se Esquadria = Esquerda"},
     {v:"esq_esquadria_dir", l:"Se Esquadria = Direita"},
+    {v:"oitao_ativo",       l:"Se Oitão Ativo"},
   ].map(c=>`<option value="${c.v}">${c.l}</option>`).join('');
 
   let wtBomRows = JSON.parse(JSON.stringify(t.bomConfig||[]));
@@ -3131,6 +3226,11 @@ function openWallTypeModal(id, cloneFrom){
     state.wallTypes=state.wallTypes.filter(wt=>wt.id!==id);
     closeModal();renderInv();render();
   };
+  // Wire wall oitão checkbox visibility
+  const wtOitaoChk=document.getElementById("wt_oitao_chk");
+  const wtOitaoNomeRow=document.getElementById("wt_oitao_nome_row");
+  if(wtOitaoChk) wtOitaoChk.onchange=()=>{if(wtOitaoNomeRow) wtOitaoNomeRow.style.display=wtOitaoChk.checked?"":"none";};
+
   document.getElementById("wt_save").onclick=()=>{
     saveState();
     const name=document.getElementById("wt_name").value.trim()||"Parede";
@@ -3149,11 +3249,18 @@ function openWallTypeModal(id, cloneFrom){
       opens:d.opens||"fora",hinge:d.hinge||"esquerda",
       name:d.name||"",showName:d.showName!==false
     }));
-    const door=doorsData.length>0?doorsData[0]:null; // keep door for backward compat
+    const door=doorsData.length>0?doorsData[0]:null;
     const doorFlexible=!!(doorsData.length>0&&document.getElementById("wt_flex").checked);
     const allowedPisoIds=Array.from(document.querySelectorAll(".wt-piso-cb:checked")).map(cb=>cb.value);
-    if(editingWallType)Object.assign(editingWallType,{name,length,thickness,door,doors:doorsData,doorFlexible,allowedPisoIds,defaultRot,tabIds,bomConfig:wtBomRows});
-    else state.wallTypes.push({id:uid(),name,length,thickness,door,doors:doorsData,doorFlexible,allowedPisoIds,defaultRot,tabIds,bomConfig:wtBomRows});
+
+    // Oitão da parede
+    const wtOChk=document.getElementById("wt_oitao_chk");
+    const possuiPossibilidadeOitao=!!(wtOChk&&wtOChk.checked);
+    const nomeOitao=possuiPossibilidadeOitao?(document.getElementById("wt_oitao_nome")?.value?.trim()||""):"";
+    const oitaoDefaultAtivo=possuiPossibilidadeOitao&&!!(document.getElementById("wt_oitao_default")?.checked);
+
+    if(editingWallType)Object.assign(editingWallType,{name,length,thickness,door,doors:doorsData,doorFlexible,allowedPisoIds,defaultRot,tabIds,bomConfig:wtBomRows,possuiPossibilidadeOitao,nomeOitao,oitaoDefaultAtivo});
+    else state.wallTypes.push({id:uid(),name,length,thickness,door,doors:doorsData,doorFlexible,allowedPisoIds,defaultRot,tabIds,bomConfig:wtBomRows,possuiPossibilidadeOitao,nomeOitao,oitaoDefaultAtivo});
     closeModal();renderInv();render();
   };
   scrim.classList.add("show");setTimeout(()=>document.getElementById("wt_name").focus(),50);
@@ -3190,7 +3297,7 @@ function renderTabs() {
   n.style.color = "var(--accent)";
   n.textContent = "+ Aba";
   n.onclick = () => {
-    requirePanelPassword(() => {
+    requireAdmin(() => {
       openTextModal("Nova Aba", "", txt => {
         if(txt && txt.trim()) {
           saveState();
@@ -3220,8 +3327,8 @@ function renderInv(){
   const renderTypeCard=(ty)=>{
     const used=usedCount(ty.id);
     const isGeral=state.activeTab==='geral';
-    const canPlace=!isGeral||panelEditUnlocked;
-    const card=document.createElement("div");card.className="ptype"+(armedType===ty.id?" armed":"")+(isGeral&&!panelEditUnlocked?" geral-only":"");
+    const canPlace=!isGeral||isAdmin();
+    const card=document.createElement("div");card.className="ptype"+(armedType===ty.id?" armed":"")+(isGeral&&!isAdmin()?" geral-only":"");
     let swatchStyle = `background:${ty.color}`;
     if (ty.hwall) swatchStyle = (ty.hwall.twoTone!==false)
       ? `background: linear-gradient(180deg, ${WOOD_L} 50%, ${WOOD_D} 50%)`
@@ -3234,27 +3341,31 @@ function renderInv(){
     const precoUnit=getPriceForType(ty.name);
     const priceBadge=precoUnit!==null
       ? `<span class="q-price-badge has-price">R$ ${precoUnit.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`
-      : `<span class="q-price-badge">${pricingData?'sem preço':'—'}</span>`;
+      : '';
+    const adminBtns=isAdmin()?`
+      <button class="mini" data-dup="${ty.id}" title="Duplicar tipo">⧉</button>
+      <button class="mini" data-edit="${ty.id}">editar</button>`:'';
     card.innerHTML=`<div class="row1"><span class="swatch" style="${swatchStyle}"></span>
       <span class="pname">${isMez(ty)?"🏗 ":""}${esc(ty.name)}</span>
-      <button class="mini" data-dup="${ty.id}" title="Duplicar tipo">⧉</button>
-      <button class="mini" data-edit="${ty.id}">editar</button></div>
+      ${adminBtns}</div>
       <div class="dims">${dimsTxt}</div>
       ${priceBadge}
-      <div class="budget"><div class="nums"><span>em uso: <b>${used}</b></span><span style="color:var(--ink-faint)">ilimitado</span></div></div>`;
+      <div class="budget"><div class="nums"><span>em uso: <b>${used}</b></span></div></div>`;
     if(canPlace) card.addEventListener("click",e=>{if(e.target.dataset.edit||e.target.dataset.dup)return;armPlace(ty.id);});
-    card.querySelector("[data-edit]").addEventListener("click",e=>{e.stopPropagation();requirePanelPassword(()=>openTypeModal(ty.id));});
-    card.querySelector("[data-dup]").addEventListener("click",e=>{e.stopPropagation();requirePanelPassword(()=>openTypeModal(null,false,ty.id));});
+    if(isAdmin()){
+      card.querySelector("[data-edit]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openTypeModal(ty.id));});
+      card.querySelector("[data-dup]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openTypeModal(null,false,ty.id));});
+    }
     inv.appendChild(card);
   };
 
   floorTypes.forEach(renderTypeCard);
   
-  if(state.activeTab === 'geral'){
+  if(state.activeTab === 'geral' && isAdmin()){
     const addFloor=document.createElement("button");
     addFloor.className="add-type";addFloor.textContent="+ Adicionar tipo de piso";
     addFloor.style.margin="4px";
-    addFloor.onclick=()=>requirePanelPassword(()=>openTypeModal(null));
+    addFloor.onclick=()=>requireAdmin(()=>openTypeModal(null));
     inv.appendChild(addFloor);
   }
 
@@ -3265,11 +3376,11 @@ function renderInv(){
 
   mezTypes.forEach(renderTypeCard);
 
-  if(state.activeTab === 'geral'){
+  if(state.activeTab === 'geral' && isAdmin()){
     const addMez=document.createElement("button");
     addMez.className="add-type";addMez.textContent="+ Adicionar mezanino";
     addMez.style.margin="4px";
-    addMez.onclick=()=>requirePanelPassword(()=>openTypeModal(null,true));
+    addMez.onclick=()=>requireAdmin(()=>openTypeModal(null,true));
     inv.appendChild(addMez);
   }
 
@@ -3282,37 +3393,41 @@ function renderInv(){
   currentWallTypes.forEach(wt=>{
     const used=usedCountWall(wt.id);
     const isGeral=state.activeTab==='geral';
-    const canPlace=!isGeral||panelEditUnlocked;
+    const canPlace=!isGeral||isAdmin();
     const info=wallTypeRectInfo(wt);
     const _selPanel2=state.panels.find(p=>p.id===selId);
     const _pisoTid=_selPanel2?_selPanel2.typeId:null;
     const _wtOk=!(wt.allowedPisoIds&&wt.allowedPisoIds.length>0)||!_pisoTid||!wt.allowedPisoIds.includes(_pisoTid);
-    const card=document.createElement("div");card.className="ptype"+(armedWallType===wt.id?" armed":"")+(isGeral&&!panelEditUnlocked?" geral-only":"");
+    const card=document.createElement("div");card.className="ptype"+(armedWallType===wt.id?" armed":"")+(isGeral&&!isAdmin()?" geral-only":"");
     if(!_wtOk){card.style.opacity="0.35";card.title="Incompatível com o tipo de piso selecionado";}
+    const wallAdminBtns=isAdmin()?`
+      <button class="mini" data-dup="${wt.id}" title="Duplicar parede">⧉</button>
+      <button class="mini" data-edit="${wt.id}">editar</button>`:'';
     card.innerHTML=`<div class="row1"><span class="swatch" style="background:#1C1F24"></span>
       <span class="pname">${esc(wt.name)}</span>
-      <button class="mini" data-dup="${wt.id}" title="Duplicar parede">⧉</button>
-      <button class="mini" data-edit="${wt.id}">editar</button></div>
+      ${wallAdminBtns}</div>
       <div class="dims">${fmt(info.length)} m · esp. ${fmt(info.thickness)} m${wt.door?" · 🚪 com porta":""}</div>
-      <div class="budget"><div class="nums"><span>em uso: <b>${used}</b></span><span style="color:var(--ink-faint)">ilimitado</span></div></div>`;
+      <div class="budget"><div class="nums"><span>em uso: <b>${used}</b></span></div></div>`;
     if(canPlace) card.addEventListener("click",e=>{if(e.target.dataset.edit||e.target.dataset.dup)return;armWallPlace(wt.id);});
-    card.querySelector("[data-edit]").addEventListener("click",e=>{e.stopPropagation();requirePanelPassword(()=>openWallTypeModal(wt.id));});
-    card.querySelector("[data-dup]").addEventListener("click",e=>{e.stopPropagation();requirePanelPassword(()=>openWallTypeModal(null,wt.id));});
+    if(isAdmin()){
+      card.querySelector("[data-edit]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openWallTypeModal(wt.id));});
+      card.querySelector("[data-dup]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openWallTypeModal(null,wt.id));});
+    }
     inv.appendChild(card);
   });
   
-  if(state.activeTab === 'geral' && !panelEditUnlocked){
+  if(state.activeTab === 'geral' && !isAdmin()){
     const hint=document.createElement("p");
     hint.style.cssText="font-size:11px;color:var(--ink-faint);margin:8px 4px 0;line-height:1.5;";
     hint.textContent="Na aba Geral só é possível criar e editar tipos. Para usar, selecione outra aba.";
     inv.appendChild(hint);
   }
   
-  if(state.activeTab === 'geral'){
+  if(state.activeTab === 'geral' && isAdmin()){
     const addWall=document.createElement("button");
     addWall.className="add-type";addWall.textContent="+ Adicionar tipo de parede";
     addWall.style.margin="4px";
-    addWall.onclick=()=>requirePanelPassword(()=>openWallTypeModal(null));
+    addWall.onclick=()=>requireAdmin(()=>openWallTypeModal(null));
     inv.appendChild(addWall);
   }
 
@@ -3789,7 +3904,8 @@ function placeAt(wx,wy){
   const dw=ty.defaultWalls||{l:"solid",r:"solid"};
   state.panels.push({id:uid(),typeId:armedType,cx,cy,rot:ghostRot,
     walls:{l:dw.l||"solid",r:dw.r||"solid"},corners:{tl:false,tr:false,bl:false,br:false},
-    name:{text:ty.name,dx:0,dy:0,show:false}});
+    name:{text:ty.name,dx:0,dy:0,show:false},
+    oitaoAtivo:!!(ty.possuiPossibilidadeOitao&&ty.oitaoDefaultAtivo)});
   renderTabs();renderInv();render();}
 
 // Returns an error message if the wall is incompatible with the floor restriction, or null if OK.
@@ -3818,7 +3934,9 @@ function placeWallAt(wx,wy){
   const compatErr=wallPisoCompatError(finalInst);
   if(compatErr){toastError(`${compatErr}.`);return;}
   saveState();
-  const inst={id:uid(),wallTypeId:armedWallType,ax,ay,rot:ghostRot};
+  const wt2=wallTypeOf(armedWallType);
+  const inst={id:uid(),wallTypeId:armedWallType,ax,ay,rot:ghostRot,
+    oitaoAtivo:!!(wt2?.possuiPossibilidadeOitao&&wt2?.oitaoDefaultAtivo)};
   state.wallInstances.push(inst);selId=inst.id;
   renderTabs();renderInv();render();}
 
@@ -3972,36 +4090,13 @@ document.addEventListener("keydown",ev=>{
 const scrim=document.getElementById("scrim"),modalBody=document.getElementById("modalBody");
 function closeModal(){scrim.classList.remove("show");modalBody.classList.remove("q-wide");}
 
-const PANEL_EDIT_PASSWORD="@321Modul4r";
-let panelEditUnlocked=false;
-function requirePanelPassword(onSuccess){
-  if(panelEditUnlocked){onSuccess();return;}
-  modalBody.innerHTML=`<h3>Acesso restrito</h3>
-    <p class="sub">Criar ou editar tipos requer senha.</p>
-    <div class="field"><label>Senha</label>
-      <div style="position:relative;display:flex;align-items:center">
-        <input id="pw_in" type="password" autocomplete="off" style="padding-right:38px;width:100%">
-        <button id="pw_show" type="button" style="position:absolute;right:6px;background:none;border:none;padding:4px;cursor:pointer;color:var(--ink-faint);font-size:16px;line-height:1" title="Mostrar/ocultar senha">👁</button>
-      </div>
-    </div>
-    <p class="sub" id="pw_err" style="color:var(--over);display:none">Senha incorreta.</p>
-    <div class="modal-actions"><button class="tbtn" id="pw_cancel">Cancelar</button><button class="tbtn primary" id="pw_ok">Entrar</button></div>`;
-  document.getElementById("pw_cancel").onclick=closeModal;
-  document.getElementById("pw_show").onclick=()=>{
-    const inp=document.getElementById("pw_in");
-    inp.type=inp.type==="password"?"text":"password";
-    document.getElementById("pw_show").style.color=inp.type==="text"?"var(--accent)":"var(--ink-faint)";
-  };
-  const tryUnlock=()=>{
-    const v=document.getElementById("pw_in").value;
-    if(v===PANEL_EDIT_PASSWORD){panelEditUnlocked=true;closeModal();renderInv();onSuccess();}
-    else{document.getElementById("pw_err").style.display="";document.getElementById("pw_in").value="";document.getElementById("pw_in").focus();}
-  };
-  document.getElementById("pw_ok").onclick=tryUnlock;
-  scrim.classList.add("show");
-  const i=document.getElementById("pw_in");
-  setTimeout(()=>i.focus(),50);
-  i.addEventListener("keydown",e=>{if(e.key==="Enter")tryUnlock();});
+// Verificação de privilégio Admin (perfil retornado pelo backend)
+function isAdmin(){return pricingData?.perfil==="Admin";}
+
+// Guarda de acesso: executa fn() somente se Admin, senão mostra erro discreto
+function requireAdmin(fn){
+  if(isAdmin()){fn();}
+  else{toastError("Esta ação requer perfil Admin.");}
 }
 
 let currentEsqData=[], currentEsqQty=0;
@@ -4208,6 +4303,16 @@ function openTypeModal(id, forceMez, cloneFrom){
       <p class="sub" style="margin:4px 0 0;font-size:10.5px;color:var(--ink-faint)">Se vazio, o quantitativo usa o nome do painel como produto. Condições lidas no momento do cálculo.</p>
     </div>
 
+    <div class="field" id="f_oitao_row" style="display:none;margin-bottom:4px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+      <input type="checkbox" id="f_oitao_chk" style="width:auto;margin:0" ${t.possuiPossibilidadeOitao?"checked":""}> △ Possui possibilidade de oitão</label></div>
+    <div class="field" id="f_oitao_nome_row" style="${t.possuiPossibilidadeOitao?"":"display:none"}">
+      <label>Nome do Oitão <span style="font-weight:400;color:var(--ink-faint);font-size:11px">(label visual no SVG)</span></label>
+      <input id="f_oitao_nome" value="${esc(t.nomeOitao||"")}" placeholder="Ex: Oitão A-Frame">
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:600;font-size:12px;text-transform:none;color:var(--ink)">
+        <input type="checkbox" id="f_oitao_default" style="width:auto;margin:0" ${t.oitaoDefaultAtivo?"checked":""}> Ativado por padrão ao posicionar
+      </label>
+    </div>
+
     <div class="modal-actions">${id?'<button class="del-link" id="f_del">Excluir tipo</button>':''}
       <button class="tbtn" id="f_cancel">Cancelar</button><button class="tbtn primary" id="f_save">Salvar</button></div>`;
       
@@ -4252,6 +4357,24 @@ function openTypeModal(id, forceMez, cloneFrom){
   const redeChkEl=document.getElementById("f_rede_chk");
   if(redeChkEl) redeChkEl.onchange=updateRedeVis;
 
+  // Oitão: visível apenas para piso; nome só aparece quando checkbox marcado
+  const updateOitaoVis=()=>{
+    const isPiso=typeModalCategory==='piso';
+    const oRow=document.getElementById("f_oitao_row");
+    const oNome=document.getElementById("f_oitao_nome_row");
+    const oChk=document.getElementById("f_oitao_chk");
+    if(oRow) oRow.style.display=isPiso?"":"none";
+    if(oNome) oNome.style.display=(isPiso&&oChk?.checked)?"":"none";
+  };
+  document.getElementById("f_oitao_chk")?.addEventListener("change",updateOitaoVis);
+  updateOitaoVis();
+  // Reatrelar categoria para também atualizar oitão
+  const _pisoBtn=document.getElementById("f_cat_piso");
+  const _mezBtn=document.getElementById("f_cat_mez");
+  const _origPiso=_pisoBtn.onclick; const _origMez=_mezBtn.onclick;
+  _pisoBtn.onclick=()=>{_origPiso?.();updateOitaoVis();};
+  _mezBtn.onclick=()=>{_origMez?.();updateOitaoVis();};
+
   hwChk.onchange=paintCategory;
   const lamChk=document.getElementById("f_lam");
   lamChk.onchange=paintCategory;
@@ -4268,6 +4391,7 @@ function openTypeModal(id, forceMez, cloneFrom){
         {v:"padrao",             l:"Padrão / Sempre"},
         {v:"esq_esquadria_esq",  l:"Se Esquadria = Esquerda"},
         {v:"esq_esquadria_dir",  l:"Se Esquadria = Direita"},
+        {v:"oitao_ativo",        l:"Se Oitão Ativo"},
       ];
     }
     // Piso (e mezanino)
@@ -4277,6 +4401,7 @@ function openTypeModal(id, forceMez, cloneFrom){
       {v:"piso_parede_dir_solida",    l:"Se Parede Dir = Sólida"},
       {v:"piso_parede_dir_aberturas", l:"Se Parede Dir = Aberturas"},
       {v:"piso_com_quina",            l:"Com recortes de quina (◰ ◳ ◱ ◲)"},
+      {v:"oitao_ativo",               l:"Se Oitão Ativo"},
     ] : [];
     return [
       {v:"padrao", l:"Padrão / Sempre"},
@@ -4429,8 +4554,14 @@ function saveType(defaultWalls){
   });
   const bomConfig=bomRows.length?bomRows:null;
 
-  if(editingType)Object.assign(editingType,{wallThick,lateralEsq,rede,bomConfig});
-  else if(state.types.length>0){const last=state.types[state.types.length-1];last.wallThick=wallThick;last.lateralEsq=lateralEsq;last.rede=rede;last.bomConfig=bomConfig;}
+  // Oitão
+  const oitaoChk=document.getElementById("f_oitao_chk");
+  const possuiPossibilidadeOitao=!!(oitaoChk&&oitaoChk.checked&&!isMezCat);
+  const nomeOitao=possuiPossibilidadeOitao?(document.getElementById("f_oitao_nome")?.value?.trim()||""):"";
+  const oitaoDefaultAtivo=possuiPossibilidadeOitao&&!!(document.getElementById("f_oitao_default")?.checked);
+
+  if(editingType)Object.assign(editingType,{wallThick,lateralEsq,rede,bomConfig,possuiPossibilidadeOitao,nomeOitao,oitaoDefaultAtivo});
+  else if(state.types.length>0){const last=state.types[state.types.length-1];Object.assign(last,{wallThick,lateralEsq,rede,bomConfig,possuiPossibilidadeOitao,nomeOitao,oitaoDefaultAtivo});}
   // Manter lista de tipos em ordem alfabética após criar, duplicar ou renomear
   state.types.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR',{sensitivity:'base'}));
   closeModal();renderInv();render();
@@ -5142,6 +5273,9 @@ const BOM_CONFIG = {
 function avaliarCondicaoBOM(cond, panel) {
   if (cond === "padrao") return true;
 
+  // ── Oitão ativo (pisos e paredes) ────────────────────────────────────
+  if (cond === "oitao_ativo") return !!panel.oitaoAtivo;
+
   // ── Condições de PISO ──────────────────────────────────────────────────
   if (cond === "piso_com_quina") {
     const c = panel.corners || {};
@@ -5152,7 +5286,6 @@ function avaliarCondicaoBOM(cond, panel) {
   }
   if (cond === "piso_parede_esq_aberturas") {
     const side = (panel.walls || {}).l;
-    // "open" = abertura livre; "window" = janela — ambos são Aberturas
     return side === "open" || side === "window" || side === "door";
   }
   if (cond === "piso_parede_dir_solida") {
@@ -5164,12 +5297,10 @@ function avaliarCondicaoBOM(cond, panel) {
   }
 
   // ── Condições de PAREDE (wallInstance) ────────────────────────────────
-  // Usa o hinge da INSTÂNCIA (doorHinge) como override; cai no tipo se ausente.
   if (cond === "esq_esquadria_esq" || cond === "esq_esquadria_dir") {
     const wt = wallTypeOf(panel.wallTypeId);
     if (!wt) return false;
     const allDoors = (wt.doors && wt.doors.length) ? wt.doors : (wt.door ? [wt.door] : []);
-    // Instância pode sobrescrever o hinge via doorHinge
     const effectiveHinge = panel.doorHinge || (allDoors[0] && allDoors[0].hinge) || 'esquerda';
     if (cond === "esq_esquadria_esq") return effectiveHinge === "esquerda";
     if (cond === "esq_esquadria_dir") return effectiveHinge === "direita";
@@ -5211,6 +5342,7 @@ function gerarRelatorioQuantitativo(panels) {
         addItem(ty.name, 1);
       }
     }
+    // (oitão: contabilizado via condição "oitao_ativo" no bomConfig do tipo)
   });
 
   // ── Paredes (wallInstances) ────────────────────────────────────────────

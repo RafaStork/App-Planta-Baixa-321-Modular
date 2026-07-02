@@ -123,7 +123,7 @@
   .scrim.show{display:grid}
   .modal{background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);
     width:100%;max-width:400px;padding:20px;max-height:88vh;overflow:auto}
-  .modal.q-wide{max-width:min(96vw,920px);padding:18px 22px;overflow:auto}
+  .modal.q-wide{max-width:min(96vw,920px);padding:18px 22px;overflow-y:auto}
   /* ── Overlay separado para config de margens (segurança visual) ── */
   #gestorOverlay{position:fixed;inset:0;background:rgba(20,24,30,.60);display:none;place-items:center;z-index:60}
   #gestorOverlay.show{display:grid}
@@ -185,18 +185,28 @@
     aside.open{transform:none}
     .menu-toggle{display:inline-flex}
     .hint{display:none}
+    /* Ponto 1: em telas pequenas, o modal usa quase toda a altura da tela e
+       o padding lateral encolhe, garantindo que os botões do rodapé (⚙,
+       Limpar ajustes, PDF, Fechar) sempre fiquem alcançáveis via scroll. */
+    .modal{max-height:96vh}
+    .modal.q-wide{padding:14px 12px;max-height:96vh}
+    .q-table-wrap{max-height:34vh}
   }
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 
   /* ── Módulo Quantitativo ── */
-  .q-modal{display:flex;flex-direction:column;gap:8px;max-height:82vh}
+  .q-modal{display:flex;flex-direction:column;gap:8px}
   .q-modal h3{margin:0 0 10px;font-size:17px;font-weight:800;color:var(--ink)}
-  .q-header{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+  .q-header{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;flex-shrink:0}
   .q-session{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
   .q-session label{display:none} /* seletores removidos — controle por token */
   .q-session select{display:none}
   .q-margem-badge{margin-left:auto;font-size:12px;color:var(--ink-soft);padding:4px 10px;background:var(--paper);border:1px solid var(--line);border-radius:20px;white-space:nowrap}
   .q-margem-badge b{color:var(--accent)}
+  .q-viewtabs{display:flex;gap:6px}
+  .q-viewtab{border:1px solid var(--line);background:var(--bg);color:var(--ink-soft);border-radius:8px;padding:7px 12px;font-size:12.5px;font-weight:700;font-family:'Montserrat',sans-serif;cursor:pointer}
+  .q-viewtab:hover{background:var(--paper)}
+  .q-viewtab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
   /* ── Auth overlay ── */
   #authOverlay{position:fixed;inset:0;z-index:9999;background:rgba(18,22,26,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .4s}
   #authOverlay.hidden{opacity:0;pointer-events:none}
@@ -233,7 +243,7 @@
   .q-gp-status{font-size:11.5px;color:#2e7d32;min-height:15px;width:100%;margin-top:2px}
   .q-summary{display:flex;gap:16px;padding:8px 12px;border-radius:8px;background:var(--paper);border:1px solid var(--line);font-size:12.5px;color:var(--ink-soft);flex-wrap:wrap;flex-shrink:0}
   .q-summary b{color:var(--ink)}
-  .q-table-wrap{overflow-y:auto;flex:1;min-height:120px;border:1px solid var(--line);border-radius:10px;margin:0}
+  .q-table-wrap{overflow-y:auto;max-height:42vh;min-height:120px;border:1px solid var(--line);border-radius:10px;margin:0}
   .q-table{width:100%;border-collapse:collapse;font-size:13px}
   .q-table thead th{position:sticky;top:0;background:var(--paper);z-index:2;padding:8px 10px;text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);border-bottom:1px solid var(--line)}
   .q-table tbody tr:hover{background:var(--bg)}
@@ -245,6 +255,8 @@
   .q-table .q-qty-cell{font-size:15px;font-weight:800;color:var(--ink)}
   .q-table .q-sem-preco{color:var(--ink-faint);font-size:11px}
   .q-table .q-preco-cell{color:var(--ink-soft)}
+  .q-insumo-row{background:var(--bg)}
+  .q-insumo-row td{border-bottom-style:dashed}
   .q-table .q-no-preco-row td{opacity:.65}
   .q-warn{margin-top:8px;padding:8px 12px;border-radius:8px;background:#fff8e1;border:1px solid #ffe082;font-size:12px;color:#795548;flex-shrink:0}
   .q-total-block{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:2px solid var(--line);margin-top:0;background:var(--paper);border-radius:0 0 10px 10px;flex-shrink:0}
@@ -309,8 +321,13 @@
     <button class="tbtn" id="btnNew">Nova</button>
     <button class="tbtn" id="btnQuant" title="Quantitativo e orçamento">📊 Quantitativo</button>
     <button class="tbtn accent" id="btnPdf">Exportar PDF</button>
-    <button class="tbtn" id="btnJson">⤓ JSON</button>
-    <button class="tbtn" id="btnImport">⤒ JSON</button>
+    <button class="tbtn" id="btnSaveModelo" title="Salva apenas os dados deste projeto (painéis, cotas, aba ativa, quantitativo) — não altera o cadastro de tipos">💾 Salvar Modelo</button>
+    <button class="tbtn" id="btnImportModelo" title="Carrega um Modelo salvo (painéis, cotas, quantitativo) sobre o cadastro atual">📂 Importar Modelo</button>
+    <button class="tbtn" id="btnPlantasModelo" title="Plantas pré-definidas — carregue um modelo de planta pronto">📐 Plantas Modelo</button>
+    <span id="jsonAdminBtns" style="display:none;gap:8px">
+      <button class="tbtn" id="btnJson">⤓ JSON</button>
+      <button class="tbtn" id="btnImport">⤒ JSON</button>
+    </span>
   </div>
   <!-- Chip de sessão: perfil + franquia + botão Sair -->
   <div id="userInfoBar" class="user-chip" style="display:none">
@@ -360,6 +377,7 @@
 </main>
 
 <input type="file" id="fileInput" accept="application/json" style="display:none">
+<input type="file" id="fileInputModelo" accept="application/json" style="display:none">
 <div class="scrim" id="scrim"><div class="modal" id="modalBody"></div></div>
 
 <div class="scrim" id="previewScrim">
@@ -406,7 +424,20 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzTyyERPnyf2al4makkUYuK
 // }
 let pricingData = null;
 let pricingMap  = {};
+let insumosMap  = {}; // Ponto 5: { painelRef: [{painelRef, nome, precoFinal, precoBase?}, ...] }
 let tokenAtivoSessao = ""; // token ativo na sessão atual (independente de localStorage ou URL)
+
+// ── Constrói pricingMap e insumosMap (Ponto 5) a partir da resposta da API ──
+function aplicarPricingData(data) {
+  pricingData = data;
+  pricingMap  = {};
+  (data.produtos || []).forEach(p => { pricingMap[p.nome] = p; });
+  insumosMap = {};
+  (data.insumos || []).forEach(ins => {
+    if (!insumosMap[ins.painelRef]) insumosMap[ins.painelRef] = [];
+    insumosMap[ins.painelRef].push(ins);
+  });
+}
 
 // ── Re-fetches pricing data from the backend and refreshes open UI ──────────
 // Called after a successful margin/price save so the app always shows the
@@ -418,9 +449,7 @@ async function recarregarPrecos() {
     if (!res.ok) return;
     const data = await res.json();
     if (!data.ok) return;
-    pricingData = data;
-    pricingMap  = {};
-    (data.produtos || []).forEach(p => { pricingMap[p.nome] = p; });
+    aplicarPricingData(data);
     // Atualiza modal do quantitativo se estiver aberto
     if (document.querySelector('.scrim.show')) abrirQuantitativo();
   } catch (e) {
@@ -430,7 +459,9 @@ async function recarregarPrecos() {
 // Estado do modal de quantitativo — persiste entre aberturas na mesma sessão
 let qAjustes = {};             // { nomeProduto: deltaQty }
 let qNovosItens = new Set();   // nomes de produtos adicionados manualmente que não estão no BOM
+let qNovosInsumos = new Set(); // nomes de insumos adicionados manualmente que não estão no BOM
 let qDesconto = { tipo: 'percent', valor: 0 }; // desconto aplicado ao orçamento
+let qViewTab = 'paineis';      // 'paineis' | 'insumos' — sub-aba ativa no modal de Quantitativo
 let bomClipboard = null;       // clipboard para copiar/colar BOM entre painéis (piso)
 let wtBomClipboard = null;    // clipboard para copiar/colar BOM entre paredes
 const uid=()=>Math.random().toString(36).slice(2,9);
@@ -466,8 +497,7 @@ let state={
     "local": "",
     "modelo": "",
     "revisao": "01",
-    "projetadoPor": "321 MODULAR",
-    "logo": "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iQ2FtYWRhXzIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDMzOC40NSAxMDcuOTUiPgo8Zz4KICAgIDxwYXRoIGZpbGw9IiNlZDZiMWQiIGQ9Ik01Ni40MiwxMDYuMjdjLS4zNywwLS43NCwwLTEuMTEtLjAycy0uNzQtLjAzLTEuMTEtLjA2LS43NC0uMDYtMS4xLS4wOS0uNzMtLjA4LTEuMS0uMTMtLjczLS4xLTEuMS0uMTctLjczLS4xMy0xLjEtLjItLjczLS4xNS0xLjEtLjI0LS43My0uMTgtMS4wOS0uMjhjLS4zNi0uMS0uNzItLjItMS4wNy0uMzFzLS42OS0uMjItMS4wMy0uMzQtLjY3LS4yNC0uOTktLjM3LS42NC0uMjctLjk1LS40MS0uNjEtLjI5LS45MS0uNDQtLjU4LS4zMS0uODYtLjQ3LS41NS0uMzMtLjgyLS41LS41My0uMzUtLjc4LS41M2wuNDgtLjk0LjQ4LS45NC40OC0uOTQuNDgtLjk0LjQ4LS45NC40OC0uOTQuNDgtLjk0LjQ4LS45NGMuMi4xNS40MS4yOS42Mi40M3MuNDMuMjcuNjQuNDEuNDQuMjYuNjcuMzguNDYuMjQuNjkuMzYuNDcuMjMuNzIuMzQuNDkuMjEuNzQuMzIuNTEuMi43Ny4yOS41Mi4xOC43OS4yN2MuMjcuMDkuNTQuMTcuODEuMjRzLjU0LjE1LjgxLjIxLjU0LjEyLjgxLjE4LjU0LjEuODEuMTUuNTQuMDguODEuMTEuNTQuMDYuODIuMDguNTQuMDQuODIuMDUuNTUuMDIuODIuMDJjLjMxLDAsLjYxLDAsLjktLjAycy41OC0uMDQuODUtLjA3LjU0LS4wNy44LS4xMS41MS0uMS43NS0uMTYuNDgtLjEzLjctLjIxLjQ0LS4xNi42NS0uMjUuNDEtLjE5LjYxLS4zLjM4LS4yMi41Ni0uMzRjLjE4LS4xMi4zNC0uMjUuNS0uMzhzLjMtLjI3LjQzLS40Mi4yNS0uMjkuMzctLjQ1LjIxLS4zMi4zLS40OC4xNy0uMzQuMjMtLjUyLjEyLS4zNi4xNy0uNTUuMDgtLjM5LjEtLjU5LjAzLS40MS4wMy0uNjIsMC0uNC0uMDMtLjU5LS4wNS0uMzgtLjA5LS41Ni0uMDktLjM2LS4xNS0uNTMtLjEzLS4zNC0uMjEtLjQ5LS4xNy0uMzEtLjI2LS40Ni0uMjEtLjI5LS4zMi0uNDMtLjI1LS4yNy0uMzgtLjQtLjI4LS4yNS0uNDQtLjM3Yy0uMTYtLjEyLS4zMy0uMjMtLjUxLS4zM3MtLjM3LS4yLS41OC0uMjgtLjQyLS4xNy0uNjUtLjI0LS40Ny0uMTQtLjcyLS4yLS41Mi0uMTEtLjgtLjE1LS41Ny0uMDgtLjg3LS4xMS0uNjEtLjA1LS45NC0uMDctLjY2LS4wMi0xLjAxLS4wMmgtNC40OXYtNi41bDEuNDgtMS42OCwxLjQ4LTEuNjgsMS40OC0xLjY4LDEuNDgtMS42OCwxLjQ4LTEuNjgsMS40OC0xLjY4LDEuNDgtMS42OCwxLjQ4LTEuNjguMTQuNDQuMTQuNDQuMTQuNDQuMTQuNDQuMTQuNDQuMTQuNDQuMTQuNDQuMTQuNDRoLTIyLjI5di03LjloMjkuNzZ2Ni4zOGwtMS40NywxLjY4LTEuNDcsMS42OC0xLjQ3LDEuNjgtMS40NywxLjY4LTEuNDcsMS42OC0xLjQ3LDEuNjgtMS40NywxLjY4LTEuNDcsMS42OC0uNjItLjM2LS42Mi0uMzYtLjYyLS4zNi0uNjItLjM2LS42Mi0uMzYtLjYyLS4zNi0uNjItLjM2LS42Mi0uMzZoMi44NWMuNjUsMCwxLjI5LjAyLDEuOS4wNnMxLjIxLjA5LDEuNzguMTcsMS4xMy4xNywxLjY2LjI4LDEuMDUuMjQsMS41NC4zOS45Ny4zMSwxLjQyLjUuODkuMzksMS4zLjYxLjgxLjQ2LDEuMTguNzIuNzMuNTMsMS4wNi44M2MuMzMuMjkuNjUuNi45NC45MXMuNTYuNjQuODEuOTcuNDguNjguNjksMS4wNC40LjcyLjU2LDEuMS4zMS43Ni40NCwxLjE2LjIzLjgxLjMxLDEuMjMuMTUuODUuMTksMS4yOS4wNi44OS4wNiwxLjM1YzAsLjMsMCwuNTktLjAzLjg5cy0uMDUuNTktLjA5Ljg3LS4wOS41OC0uMTUuODYtLjEzLjU3LS4yMS44NS0uMTcuNTYtLjI2LjgzLS4yMS41NS0uMzIuODItLjI1LjU0LS4zOC44LS4yOC41My0uNDQuNzljLS4xNi4yNi0uMzIuNTItLjUuNzZzLS4zNy40OS0uNTYuNzMtLjQxLjQ3LS42My42OS0uNDUuNDQtLjY5LjY1LS40OS40Mi0uNzUuNjItLjUzLjM5LS44Mi41OC0uNTcuMzctLjg4LjU0LS42Mi4zNC0uOTQuNWMtLjMyLjE2LS42Ni4zMS0xLjAxLjQ2cy0uNy4yNy0xLjA3LjM5LS43NS4yMy0xLjE0LjMzLS44LjE5LTEuMjEuMjctLjg0LjE1LTEuMjguMjEtLjg5LjExLTEuMzUuMTUtLjkzLjA3LTEuNDIuMDktLjk4LjAzLTEuNDguMDNaIi8+CiAgICA8cGF0aCBmaWxsPSIjZjliMjE1IiBkPSJNNzcuOTIsMTA1LjU0di02LjM4bDIuMDUtMS45NCwyLjA1LTEuOTQsMi4wNS0xLjk0LDIuMDUtMS45NCwyLjA1LTEuOTQsMi4wNS0xLjk0LDIuMDUtMS45NCwyLjA1LTEuOTRjLjE2LS4xNS4zMi0uMjkuNDctLjQzcy4zLS4yOC40NC0uNDIuMjgtLjI4LjQxLS40MS4yNS0uMjcuMzctLjQuMjMtLjI2LjM0LS4zOS4yMS0uMjUuMzEtLjM4LjE5LS4yNS4yOC0uMzcuMTctLjI0LjI0LS4zNmMuMDgtLjEyLjE1LS4yMy4yMi0uMzVzLjE0LS4yMy4yLS4zNC4xMi0uMjIuMTgtLjMzLjExLS4yMi4xNi0uMzIuMS0uMjEuMTUtLjMyLjA5LS4yMS4xMy0uMzEuMDgtLjIuMTEtLjMuMDYtLjIuMDktLjI5Yy4wMy0uMS4wNS0uMTkuMDgtLjI5cy4wNS0uMTkuMDctLjI4LjA0LS4xOC4wNi0uMjcuMDMtLjE4LjA1LS4yNy4wMy0uMTguMDQtLjI2LjAyLS4xNy4wMy0uMjYuMDEtLjE3LjAyLS4yNSwwLS4xNiwwLS4yNWMwLS4yMSwwLS40Mi0uMDMtLjYycy0uMDUtLjM5LS4wOC0uNTgtLjA4LS4zNy0uMTQtLjU1LS4xMi0uMzQtLjE5LS41MS0uMTUtLjMyLS4yNC0uNDctLjE5LS4zLS4zLS40My0uMjMtLjI3LS4zNS0uNC0uMjYtLjI1LS40MS0uMzYtLjMtLjIyLS40Ni0uMzItLjMzLS4xOS0uNTEtLjI4LS4zNi0uMTYtLjU2LS4yMy0uNC0uMTQtLjYxLS4xOS0uNDMtLjExLS42Ni0uMTUtLjQ2LS4wOC0uNzEtLjExLS41LS4wNS0uNzYtLjA2LS41My0uMDItLjgxLS4wMmMtLjIyLDAtLjQ0LDAtLjY2LjAycy0uNDQuMDMtLjY1LjA1LS40My4wNS0uNjQuMDgtLjQyLjA3LS42Mi4xMS0uNDEuMDktLjYxLjE1LS40LjExLS42LjE4LS4zOS4xMy0uNTkuMjEtLjM5LjE2LS41OC4yNGMtLjE5LjA5LS4zOC4xOC0uNTYuMjhzLS4zNi4yLS41NC4zMS0uMzUuMjMtLjUxLjM1LS4zMy4yNS0uNDkuMzgtLjMyLjI3LS40Ny40Mi0uMy4zLS40NS40Ni0uMjkuMzItLjQzLjQ5LS4yNy4zNS0uNDEuNTNsLS45LS41OC0uOS0uNTgtLjktLjU4LS45LS41OC0uOS0uNTgtLjktLjU4LS45LS41OC0uOS0uNThjLjItLjMuNDEtLjYuNjQtLjg5cy40Ni0uNTcuNy0uODQuNS0uNTQuNzYtLjc5LjU0LS41LjgyLS43NC41OC0uNDcuODgtLjcuNjItLjQ0Ljk0LS42NS42Ni0uNDEsMS0uNi43LS4zOCwxLjA2LS41NmMuMzYtLjE4Ljc0LS4zNCwxLjExLS41cy43Ni0uMywxLjE2LS40My43OS0uMjUsMS4yLS4zNy44Mi0uMjEsMS4yNC0uMy44NS0uMTcsMS4yOC0uMjMuODgtLjEyLDEuMzItLjE3LjktLjA4LDEuMzYtLjEuOTMtLjAzLDEuNDEtLjAzYy4zOSwwLC43OCwwLDEuMTcuMDJzLjc2LjA0LDEuMTMuMDcuNzMuMDcsMS4wOS4xMi43MS4xLDEuMDUuMTcuNjguMTQsMS4wMi4yMi42Ni4xNy45OC4yNy42NC4yLjk0LjMxLjYxLjIzLjkxLjM2Yy4zLjEzLjU4LjI2Ljg2LjQxcy41NS4yOS44MS40NS41Mi4zMi43Ni40OC40OS4zNC43Mi41Mi40NS4zNy42Ny41Ni40Mi4zOS42Mi42LjM5LjQyLjU3LjY0LjM1LjQ1LjUyLjY4Yy4xNi4yMy4zMi40Ny40Ni43MnMuMjguNDkuNC43NS4yNC41Mi4zNC43OC4yLjU0LjI4LjgyLjE1LjU2LjIyLjg1LjExLjU5LjE1Ljg5LjA3LjYxLjA5LjkyLjAzLjYzLjAzLjk1YzAsLjE3LDAsLjM0LDAsLjUycy0uMDEuMzQtLjAyLjUxLS4wMi4zNC0uMDQuNTEtLjA0LjM0LS4wNi41MS0uMDUuMzQtLjA3LjUxLS4wNi4zNC0uMDkuNTEtLjA3LjM0LS4xLjUxLS4wOC4zNC0uMTIuNTFjLS4wNC4xNy0uMDkuMzQtLjE1LjUxcy0uMTEuMzQtLjE4LjUyLS4xMy4zNS0uMjEuNTMtLjE2LjM1LS4yNC41My0uMTguMzYtLjI3LjU0LS4yLjM2LS4zMS41NS0uMjIuMzctLjM0LjU1LS4yNC4zNy0uMzcuNTZjLS4xMy4xOS0uMjcuMzgtLjQxLjU3cy0uMy4zOS0uNDUuNTktLjMzLjQtLjUuNi0uMzUuNDEtLjU0LjYyLS4zOC40Mi0uNTkuNjQtLjQxLjQzLS42My42Ni0uNDQuNDUtLjY4LjY3LS40Ny40Ni0uNzIuNjlsLTEuNywxLjYtMS43LDEuNi0xLjcsMS42LTEuNywxLjYtMS43LDEuNi0xLjcsMS42LTEuNywxLjYtMS43LDEuNi0uMjQtLjQ1LS4yNC0uNDUtLjI0LS40NS0uMjQtLjQ1LS4yNC0uNDUtLjI0LS40NS0uMjQtLjQ1LS4yNC0uNDVoMjMuOTl2OC4wMmgtMzIuMTNaIi8+CiAgICA8cGF0aCBmaWxsPSIjMmQ1ZGE5IiBkPSJNMTIwLjY4LDEwNS41NHYtMzguODdsNC4yNSw0LjI1aC0xMi43NnYtNy45aDE4LjM0djQyLjUyaC05Ljg0WiIvPgogIDwvZz4KICA8Zz4KICAgIDxwYXRoIGZpbGw9IiMxZjMzMWMiIGQ9Ik0xNzEuNDgsNjMuMmgzLjU4Yy40NCwwLC42Ni4yNy42Ni44djQxLjMyYzAsLjUzLS4yMi44LS42Ni44aC0xLjkyYy0uNDksMC0uNzMtLjI3LS43My0uOHYtMzYuOThoLS4yN2wtMTEuNzQsMjcuN2MtLjI3LjQ5LS42LjczLS45OS43M2gtMi4xOWMtLjQ0LDAtLjc1LS4yNC0uOTMtLjczbC0xMS45My0yNy43N2gtLjI3djM3LjA1YzAsLjUzLS4yMi44LS42Ni44aC0xLjkyYy0uNDQsMC0uNjYtLjI3LS42Ni0uOHYtNDEuMzJjMC0uNTMuMjItLjguNjYtLjhoMy41OGMuMzEsMCwuNTEuMTMuNi40bDEyLjQ2LDI5LjMxaC4yN2wxMi40Ni0yOS4zMWMuMDktLjI3LjI5LS40LjYtLjRaIi8+CiAgICA8cGF0aCBmaWxsPSIjMWYzMzFjIiBkPSJNMTk4LjM1LDEwNi4xM2gtNi4xOGMtLjI3LDAtLjU0LS4wMS0uOC0uMDNzLS41MS0uMDUtLjc1LS4wOS0uNDgtLjA5LS43MS0uMTUtLjQ1LS4xMy0uNjctLjIxLS40Mi0uMTctLjYyLS4yNy0uMzktLjIxLS41OC0uMzMtLjM2LS4yNS0uNTQtLjM5LS4zNC0uMjktLjQ5LS40NWMtLjE2LS4xNi0uMy0uMzMtLjQ0LS41cy0uMjctLjM2LS4zOC0uNTUtLjIzLS4zOS0uMzItLjU5LS4xOS0uNDItLjI3LS42NC0uMTUtLjQ1LS4yMS0uNjgtLjExLS40OC0uMTUtLjcyLS4wNy0uNTEtLjA5LS43Ny0uMDMtLjUzLS4wMy0uODF2LTE4LjE3YzAtLjI4LDAtLjU1LjAzLS44MXMuMDUtLjUyLjA5LS43Ny4wOS0uNDkuMTUtLjcyLjEzLS40Ni4yMS0uNjguMTctLjQzLjI3LS42NC4yMS0uNC4zMi0uNTkuMjUtLjM3LjM4LS41NS4yOC0uMzQuNDQtLjVjLjE2LS4xNi4zMi0uMzEuNDktLjQ1cy4zNS0uMjcuNTQtLjM5LjM4LS4yMy41OC0uMzMuNDEtLjE5LjYyLS4yNy40NC0uMTUuNjctLjIxLjQ3LS4xMS43MS0uMTUuNDktLjA3Ljc1LS4wOS41Mi0uMDMuOC0uMDNoNi4xOGMuMjcsMCwuNTQuMDEuOC4wM3MuNTEuMDUuNzUuMDkuNDguMDkuNzEuMTUuNDUuMTMuNjcuMjEuNDIuMTcuNjIuMjcuMzkuMjEuNTguMzMuMzYuMjUuNTQuMzkuMzQuMjkuNDkuNDVjLjE2LjE2LjMuMzMuNDQuNXMuMjcuMzYuMzguNTUuMjMuMzkuMzIuNTkuMTkuNDIuMjcuNjQuMTUuNDUuMjEuNjguMTEuNDguMTUuNzIuMDcuNTEuMDkuNzcuMDMuNTMuMDMuODF2MTguMTdjMCwuMjgsMCwuNTUtLjAzLjgxcy0uMDUuNTItLjA5Ljc3LS4wOS40OS0uMTUuNzItLjEzLjQ2LS4yMS42OC0uMTcuNDMtLjI3LjY0LS4yMS40LS4zMi41OS0uMjUuMzctLjM4LjU1LS4yOC4zNC0uNDQuNWMtLjE2LjE2LS4zMi4zMS0uNDkuNDVzLS4zNS4yNy0uNTQuMzktLjM4LjIzLS41OC4zMy0uNDEuMTktLjYyLjI3LS40NC4xNS0uNjcuMjEtLjQ3LjExLS43MS4xNS0uNDkuMDctLjc1LjA5LS41Mi4wMy0uOC4wM1pNMTkyLjM3LDEwMy44NWg1LjczYy4xOSwwLC4zOCwwLC41Ni0uMDJzLjM2LS4wMy41My0uMDYuMzMtLjA2LjQ5LS4xLjMxLS4wOS40Ni0uMTQuMjktLjExLjQzLS4xOC4yNy0uMTQuMzktLjIyLjI0LS4xNy4zNi0uMjYuMjItLjE5LjMyLS4zYy4xLS4xMS4yLS4yMi4yOS0uMzRzLjE3LS4yNC4yNS0uMzguMTUtLjI3LjIxLS40MS4xMi0uMjkuMTctLjQ1LjEtLjMyLjEzLS40OC4wNy0uMzQuMS0uNTIuMDQtLjM2LjA2LS41NS4wMi0uMzkuMDItLjU5di0xNy45N2MwLS4yLDAtLjQtLjAyLS41OXMtLjAzLS4zOC0uMDYtLjU1LS4wNi0uMzUtLjEtLjUyLS4wOC0uMzMtLjEzLS40OC0uMTEtLjMtLjE3LS40NS0uMTMtLjI4LS4yMS0uNDEtLjE2LS4yNi0uMjUtLjM4LS4xOS0uMjMtLjI5LS4zNGMtLjEtLjExLS4yMS0uMjEtLjMyLS4zcy0uMjMtLjE4LS4zNi0uMjYtLjI2LS4xNS0uMzktLjIyLS4yOC0uMTMtLjQzLS4xOC0uMy0uMS0uNDYtLjE0LS4zMi0uMDctLjQ5LS4xLS4zNS0uMDUtLjUzLS4wNi0uMzctLjAyLS41Ni0uMDJoLTUuNzNjLS4xOSwwLS4zOCwwLS41Ni4wMnMtLjM2LjAzLS41My4wNi0uMzMuMDYtLjQ5LjEtLjMxLjA5LS40Ni4xNC0uMjkuMTItLjQyLjE5LS4yNi4xNC0uMzkuMjMtLjI0LjE3LS4zNS4yNy0uMjIuMi0uMzIuMzFjLS4xLjExLS4xOS4yMy0uMjguMzVzLS4xNy4yNS0uMjUuMzgtLjE0LjI3LS4yMS40MS0uMTIuMjktLjE3LjQ1LS4wOS4zMS0uMTMuNDgtLjA3LjM0LS4wOS41MS0uMDQuMzYtLjA2LjU0LS4wMi4zOC0uMDIuNTh2MTcuOTdjMCwuMiwwLC4zOS4wMi41OHMuMDMuMzcuMDYuNTQuMDYuMzUuMDkuNTEuMDguMzIuMTMuNDguMTEuMy4xNy40NS4xMy4yOC4yMS40MS4xNi4yNi4yNS4zOC4xOC4yNC4yOC4zNWMuMS4xMS4yMS4yMS4zMi4zMXMuMjMuMTkuMzUuMjcuMjUuMTYuMzkuMjMuMjguMTMuNDIuMTkuMy4xLjQ2LjE0LjMyLjA4LjQ5LjEuMzUuMDUuNTMuMDYuMzcuMDIuNTYuMDJaIi8+CiAgICA8cGF0aCBmaWxsPSIjMWYzMzFjIiBkPSJNMjEzLjQ0LDEwNS41MnYtMzEuMzNjMC0uMDUsMC0uMSwwLS4xNHMuMDEtLjA5LjAyLS4xMi4wMi0uMDcuMDQtLjEuMDMtLjA2LjA1LS4wOS4wNC0uMDUuMDctLjA3LjA2LS4wMy4wOS0uMDUuMDctLjAyLjEtLjAzLjA4LDAsLjEyLDBoMTIuNDJjLjI3LDAsLjU0LjAxLjguMDNzLjUxLjA1Ljc1LjA5LjQ4LjA5LjcxLjE1LjQ1LjEzLjY3LjIxLjQyLjE3LjYyLjI3LjM5LjIxLjU4LjMzLjM2LjI1LjU0LjM5LjM0LjI5LjQ5LjQ1Yy4xNi4xNi4zLjMzLjQ0LjVzLjI3LjM2LjM4LjU1LjIzLjM5LjMyLjU5LjE5LjQyLjI3LjY0LjE1LjQ1LjIxLjY4LjExLjQ4LjE1LjcyLjA3LjUxLjA5Ljc3LjAzLjUzLjAzLjgxdjE4LjE3YzAsLjI4LDAsLjU1LS4wMy44MXMtLjA1LjUyLS4wOS43Ny0uMDkuNDktLjE1LjcyLS4xMy40Ni0uMjEuNjgtLjE3LjQzLS4yNy42NC0uMjEuNC0uMzIuNTktLjI1LjM3LS4zOC41NS0uMjguMzQtLjQ0LjVjLS4xNi4xNi0uMzIuMzEtLjQ5LjQ1cy0uMzUuMjctLjU0LjM5LS4zOC4yMy0uNTguMzMtLjQxLjE5LS42Mi4yNy0uNDQuMTUtLjY3LjIxLS40Ny4xMS0uNzEuMTUtLjQ5LjA3LS43NS4wOS0uNTIuMDMtLjguMDNoLTEyLjQycy0uMDgsMC0uMTIsMC0uMDctLjAyLS4xLS4wMy0uMDYtLjAzLS4wOS0uMDUtLjA1LS4wNC0uMDctLjA3LS4wNC0uMDUtLjA1LS4wOS0uMDMtLjA3LS4wNC0uMS0uMDItLjA4LS4wMi0uMTIsMC0uMDksMC0uMTRaTTIxNi40NSwxMDMuODVoOS42NWMuMTksMCwuMzgsMCwuNTYtLjAycy4zNi0uMDMuNTMtLjA2LjMzLS4wNi40OS0uMS4zMS0uMDkuNDYtLjE0LjI5LS4xMS40My0uMTguMjctLjE0LjM5LS4yMi4yNC0uMTcuMzYtLjI2LjIyLS4xOS4zMi0uM2MuMS0uMTEuMi0uMjIuMjktLjM0cy4xNy0uMjQuMjUtLjM4LjE1LS4yNy4yMS0uNDEuMTItLjI5LjE3LS40NS4xLS4zMi4xMy0uNDguMDctLjM0LjEtLjUyLjA0LS4zNi4wNi0uNTUuMDItLjM5LjAyLS41OXYtMTcuOTdjMC0uMiwwLS40LS4wMi0uNTlzLS4wMy0uMzgtLjA2LS41NS0uMDYtLjM1LS4xLS41Mi0uMDgtLjMzLS4xMy0uNDgtLjExLS4zLS4xNy0uNDUtLjEzLS4yOC0uMjEtLjQxLS4xNi0uMjYtLjI1LS4zOC0uMTktLjIzLS4yOS0uMzRjLS4xLS4xMS0uMjEtLjIxLS4zMi0uM3MtLjIzLS4xOC0uMzYtLjI2LS4yNi0uMTUtLjM5LS4yMi0uMjgtLjEzLS40My0uMTgtLjMtLjEtLjQ2LS4xNC0uMzItLjA3LS40OS0uMS0uMzUtLjA1LS41My0uMDYtLjM3LS4wMi0uNTYtLjAyaC05LjY1cy0uMDgsMC0uMTIsMC0uMDcuMDEtLjEuMDItLjA2LjAyLS4wOS4wNC0uMDUuMDMtLjA3LjA1LS4wNC4wNC0uMDUuMDYtLjAzLjA1LS4wNC4wOC0uMDIuMDYtLjAyLjA5LDAsLjA3LDAsLjExdjI3LjA4czAsLjA3LDAsLjExLjAxLjA2LjAyLjA5LjAyLjA1LjA0LjA4LjAzLjA1LjA1LjA2LjA0LjA0LjA3LjA1LjA1LjAzLjA5LjA0LjA3LjAyLjEuMDIuMDgsMCwuMTIsMFoiLz4KICAgIDxwYXRoIGZpbGw9IiMxZjMzMWMiIGQ9Ik0yNTguOTMsNzMuNThoMS40MXMuMDksMCwuMTMsMCwuMDguMDEuMTEuMDMuMDcuMDMuMS4wNC4wNS4wNC4wOC4wNi4wNC4wNS4wNi4wOC4wMy4wNi4wNC4xLjAyLjA3LjAzLjExLDAsLjA4LDAsLjEzdjI0LjhjMCwuMjgsMCwuNTUtLjAzLjgxcy0uMDUuNTItLjA5Ljc3LS4wOS40OS0uMTUuNzItLjEzLjQ2LS4yMS42OC0uMTcuNDMtLjI3LjY0LS4yMS40LS4zMi41OS0uMjUuMzctLjM4LjU1LS4yOC4zNC0uNDQuNWMtLjE2LjE2LS4zMi4zMS0uNDkuNDVzLS4zNS4yNy0uNTQuMzktLjM4LjIzLS41OC4zMy0uNDEuMTktLjYyLjI3LS40NC4xNS0uNjcuMjEtLjQ3LjExLS43MS4xNS0uNDkuMDctLjc1LjA5LS41Mi4wMy0uOC4wM2gtNS42M2MtLjI3LDAtLjU0LS4wMS0uOC0uMDNzLS41MS0uMDUtLjc1LS4wOS0uNDgtLjA5LS43MS0uMTUtLjQ1LS4xMy0uNjctLjIxLS40Mi0uMTctLjYyLS4yNy0uMzktLjIxLS41OC0uMzMtLjM2LS4yNS0uNTQtLjM5LS4zNC0uMjktLjQ5LS40NWMtLjE2LS4xNi0uMy0uMzMtLjQ0LS41cy0uMjctLjM2LS4zOC0uNTUtLjIzLS4zOS0uMzItLjU5LS4xOS0uNDItLjI3LS42NC0uMTUtLjQ1LS4yMS0uNjgtLjExLS40OC0uMTUtLjcyLS4wNy0uNTEtLjA5LS43Ny0uMDMtLjUzLS4wMy0uODF2LTI0Ljc1YzAtLjA1LDAtLjEsMC0uMTRzLjAxLS4wOS4wMi0uMTIuMDItLjA3LjA0LS4xLjAzLS4wNi4wNi0uMDkuMDQtLjA1LjA3LS4wNy4wNi0uMDMuMDktLjA1LjA3LS4wMi4xLS4wMy4wOCwwLC4xMiwwaDEuNDZzLjA5LDAsLjEzLDAsLjA4LjAyLjExLjAzLjA3LjAzLjEuMDUuMDUuMDQuMDguMDcuMDQuMDUuMDYuMDkuMDMuMDcuMDQuMS4wMi4wOC4wMy4xMiwwLC4wOSwwLC4xNHYyNC42NWMwLC4yLDAsLjM5LjAyLjU4cy4wMy4zNy4wNi41NC4wNi4zNS4wOS41MS4wOC4zMi4xMy40OC4xMS4zLjE3LjQ1LjEzLjI4LjIxLjQxLjE2LjI2LjI0LjM4LjE4LjI0LjI4LjM1Yy4xLjExLjIxLjIxLjMyLjMxcy4yMy4xOS4zNS4yNy4yNS4xNi4zOS4yMy4yOC4xMy40Mi4xOS4zLjEuNDYuMTQuMzIuMDguNDkuMS4zNS4wNS41My4wNi4zNy4wMi41Ni4wMmg1LjE4Yy4xOSwwLC4zOCwwLC41Ni0uMDJzLjM2LS4wMy41My0uMDYuMzMtLjA2LjQ5LS4xLjMxLS4wOS40Ni0uMTQuMjktLjExLjQzLS4xOC4yNy0uMTQuMzktLjIyLjI0LS4xNy4zNi0uMjYuMjItLjE5LjMyLS4zYy4xLS4xMS4yLS4yMi4yOS0uMzRzLjE3LS4yNC4yNS0uMzguMTUtLjI3LjIxLS40MS4xMi0uMjkuMTctLjQ1LjEtLjMyLjEzLS40OC4wNy0uMzQuMS0uNTIuMDQtLjM2LjA2LS41NS4wMi0uMzkuMDItLjU5di0yNC42NWMwLS4wNSwwLS4xLDAtLjE0cy4wMS0uMDkuMDMtLjEyLjAzLS4wNy4wNC0uMS4wNC0uMDYuMDYtLjA5LjA1LS4wNS4wOC0uMDcuMDYtLjAzLjEtLjA1LjA3LS4wMi4xMS0uMDMuMDgsMCwuMTMsMFoiLz4KICAgIDxwYXRoIGZpbGw9IiMxZjMzMWMiIGQ9Ik0yODUuNjcsMTA2LjEzaC0xNS45OWMtLjM0LDAtLjUtLjItLjUtLjYxdi0zMS4zM2MwLS40LjE3LS42MS41LS42MWgxLjQ2Yy4zNywwLC41NS4yLjU1LjYxdjI5LjExYzAsLjMuMTcuNDYuNS40NmgxMy40N2MuNCwwLC42LjE5LjYuNTZ2MS4yN2MwLC4zNy0uMi41Ni0uNi41NloiLz4KICAgIDxwYXRoIGZpbGw9IiMxZjMzMWMiIGQ9Ik0yOTEsMTA2LjEzaC0xLjU2Yy0uMzcsMC0uNDktLjItLjM1LS42MWwxMC0zMS4zM2MuMS0uNC4zMy0uNjEuNy0uNjFoMi4zNmMuMzMsMCwuNTcuMi43LjYxbDEwLDMxLjMzYy4xLjQtLjAyLjYxLS4zNS42MWgtMS42MWMtLjM0LDAtLjU1LS4yLS42NS0uNjFsLTIuNzEtOC4xaC0xMy4xN2wtMi43MSw4LjFjLS4xMy40LS4zNS42MS0uNjUuNjFaTTMwMC44Niw3Ni4zNmwtNS43OCwxOC43OGgxMS44MWwtNS44My0xOC43OGgtLjJaIi8+CiAgICA8cGF0aCBmaWxsPSIjMWYzMzFjIiBkPSJNMzIwLjYxLDEwNi4xM2gtMS40NnMtLjA4LDAtLjEyLDAtLjA3LS4wMi0uMS0uMDMtLjA2LS4wMy0uMDktLjA1LS4wNS0uMDQtLjA3LS4wNy0uMDQtLjA1LS4wNS0uMDktLjAzLS4wNy0uMDQtLjEtLjAyLS4wOC0uMDItLjEyLDAtLjA5LDAtLjE0di0zMS4zM2MwLS4wNSwwLS4xLDAtLjE0cy4wMS0uMDkuMDItLjEyLjAyLS4wNy4wNC0uMS4wMy0uMDYuMDUtLjA5LjA0LS4wNS4wNy0uMDcuMDYtLjAzLjA5LS4wNS4wNy0uMDIuMS0uMDMuMDgsMCwuMTIsMGgxMS40NmMuMjcsMCwuNTQuMDEuOC4wM3MuNTEuMDUuNzUuMDkuNDguMDkuNzEuMTUuNDUuMTMuNjcuMjEuNDIuMTcuNjMuMjcuNC4yMS41OC4zMy4zNy4yNS41NC4zOS4zNC4yOS41LjQ1Yy4xNi4xNi4zMS4zMy40NS41cy4yNy4zNi4zOS41NS4yMy4zOS4zMy41OS4xOS40Mi4yNy42NC4xNS40NS4yMS42OC4xMS40OC4xNS43MmMuMDQuMjUuMDcuNTEuMDkuNzdzLjAzLjUzLjAzLjgxdjQuODFjMCwuMjQsMCwuNDctLjAyLjY5cy0uMDQuNDUtLjA3LjY2LS4wNy40Mi0uMTEuNjMtLjEuNC0uMTYuNi0uMTMuMzgtLjIuNTctLjE2LjM2LS4yNS41My0uMTkuMzQtLjI5LjUtLjIyLjMyLS4zNC40N2MtLjEyLjE1LS4yNC4zLS4zNy40M3MtLjI3LjI3LS40MS4zOS0uMjkuMjQtLjQ0LjM1LS4zMS4yMS0uNDcuMzEtLjMzLjE5LS41LjI3LS4zNS4xNi0uNTQuMjMtLjM3LjEzLS41Ny4xOS0uMzkuMS0uNi4xNXYuMmwuNzUsMS41OS43NSwxLjU5Ljc1LDEuNTkuNzUsMS41OS43NSwxLjU5Ljc1LDEuNTkuNzUsMS41OS43NSwxLjU5Yy4wMy4wNS4wNS4xLjA2LjE0cy4wMy4wOS4wMy4xMiwwLC4wNywwLC4xLS4wMS4wNi0uMDMuMDktLjAzLjA1LS4wNi4wNy0uMDUuMDMtLjA5LjA1LS4wNy4wMi0uMTIuMDMtLjA5LDAtLjE1LDBoLTEuNTZjLS4wNSwwLS4xMSwwLS4xNiwwcy0uMS0uMDItLjE0LS4wMy0uMDktLjAzLS4xMy0uMDUtLjA4LS4wNC0uMTItLjA3LS4wNy0uMDUtLjExLS4wOS0uMDYtLjA3LS4wOS0uMS0uMDYtLjA4LS4wOC0uMTItLjA1LS4wOS0uMDctLjE0bC0uNzQtMS41OS0uNzQtMS41OS0uNzQtMS41OS0uNzQtMS41OS0uNzQtMS41OS0uNzQtMS41OS0uNzQtMS41OS0uNzQtMS41OWgtNy45NHMtLjA4LDAtLjEyLDAtLjA3LjAxLS4xLjAyLS4wNi4wMi0uMDkuMDQtLjA1LjAzLS4wNy4wNS0uMDQuMDQtLjA1LjA2LS4wMy4wNS0uMDQuMDgtLjAyLjA2LS4wMi4wOSwwLC4wNywwLC4xMXYxMi4zYzAsLjA1LDAsLjEsMCwuMTRzLS4wMS4wOS0uMDMuMTItLjAzLjA3LS4wNC4xLS4wNC4wNi0uMDYuMDktLjA1LjA1LS4wOC4wNy0uMDYuMDMtLjEuMDUtLjA3LjAyLS4xMS4wMy0uMDgsMC0uMTMsMFpNMzIxLjY3LDkwLjU5aDguN2MuMTksMCwuMzgsMCwuNTYtLjAycy4zNi0uMDMuNTMtLjA2LjM0LS4wNi41LS4xLjMxLS4wOS40Ni0uMTQuMjktLjExLjQzLS4xOC4yNy0uMTQuNC0uMjIuMjUtLjE3LjM2LS4yNi4yMy0uMTkuMzMtLjNjLjEtLjExLjItLjIyLjI5LS4zNHMuMTgtLjI0LjI2LS4zNy4xNS0uMjcuMjItLjQxLjEyLS4yOS4xOC0uNDQuMS0uMzEuMTQtLjQ4LjA3LS4zMy4xLS41MS4wNS0uMzYuMDYtLjU0LjAyLS4zOC4wMi0uNTh2LTQuNzZjMC0uMiwwLS4zOS0uMDItLjU4cy0uMDMtLjM3LS4wNi0uNTQtLjA2LS4zNS0uMS0uNTEtLjA5LS4zMi0uMTQtLjQ4LS4xMS0uMy0uMTgtLjQ1LS4xNC0uMjgtLjIyLS40MS0uMTYtLjI2LS4yNi0uMzgtLjE5LS4yNC0uMjktLjM1Yy0uMS0uMTEtLjIxLS4yMS0uMzMtLjMxcy0uMjQtLjE5LS4zNi0uMjctLjI2LS4xNi0uNC0uMjMtLjI4LS4xMy0uNDMtLjE5LS4zLS4xLS40Ni0uMTQtLjMyLS4wOC0uNS0uMS0uMzUtLjA1LS41My0uMDYtLjM3LS4wMi0uNTYtLjAyaC04LjdzLS4wOCwwLS4xMiwwLS4wNy4wMS0uMS4wMi0uMDYuMDItLjA5LjA0LS4wNS4wMy0uMDcuMDUtLjA0LjA0LS4wNS4wNi0uMDMuMDUtLjA0LjA4LS4wMi4wNi0uMDIuMDksMCwuMDcsMCwuMTF2MTMuODJzMCwuMDcsMCwuMTEuMDEuMDYuMDIuMDkuMDIuMDUuMDQuMDguMDMuMDUuMDUuMDYuMDQuMDQuMDcuMDUuMDUuMDMuMDkuMDQuMDcuMDIuMS4wMi4wOCwwLC4xMiwwWiIvPgogIDwvZz4KICA8cG9seWdvbiBmaWxsPSIjMzk1ZjI5IiBwb2ludHM9IjcwLjc5IDAgNi41NSAxMDcuOTUgMTEuMDYgMTA3Ljk1IDc1LjMxIDAgNzAuNzkgMCIvPgogIDxwb2x5Z29uIGZpbGw9IiM2Mzg4NTIiIHBvaW50cz0iNjQuMjQgMCAwIDEwNy45NSAxLjUgMTA3Ljk1IDY1Ljc1IDAgNjQuMjQgMCIvPgogIDxnPgogICAgPHBhdGggZmlsbD0iIzFmMzMxYiIgZD0iTTM3LjkzLDczLjU1bC0yMC4xOSwzMy45M2MtLjA5LjE1LS4xNy4zMS0uMjQuNDhoOS4wOWwyMC40OC0zNC40MWgtOS4xNFoiLz4KICAgIDxwYXRoIGZpbGw9IiMxZjMzMWIiIGQ9Ik01NS4zOCw1OS41OEw4Ni40Nyw3LjM0bDMzLjcsNTIuMThoOS4yN2MtLjA4LS4xOS0uMTctLjM2LS4yOC0uNTNMOTEuMDcsMGgtOS4zN2wtMzUuNDYsNTkuNThoOS4xNFoiLz4KICA8L2c+Cjwvc3ZnPg=="
+    "projetadoPor": "321 MODULAR"
   },
   "tabs": [
     {
@@ -489,6 +519,42 @@ let state={
   ],
   "activeTab": "geral",
   "types": [
+    {
+      "id": "ky8g9ro",
+      "name": "A-Frame - EC01 / Escada Santos Dumont Patamar",
+      "w": 0.65,
+      "d": 1.38,
+      "defaultRot": 270,
+      "tabIds": [
+        "geral",
+        "ok68q7e"
+      ],
+      "bomConfig": [
+        {
+          "produtoNome": "EC01 / ESCADA SANTOS DUMONT PATAMAR COM CORRIMAO",
+          "condicao": "padrao",
+          "qty": 1
+        }
+      ],
+      "isStair": true,
+      "patamar": true,
+      "patamarComprimento": 0.8,
+      "color": "#CFC8B8",
+      "hwall": null,
+      "mezanino": null,
+      "lamina": null,
+      "defaultWalls": {
+        "l": "none",
+        "r": "none"
+      },
+      "lockWalls": true,
+      "wallThick": 0.1,
+      "lateralEsq": null,
+      "rede": null,
+      "possuiPossibilidadeOitao": false,
+      "nomeOitao": "",
+      "oitaoDefaultAtivo": false
+    },
     {
       "id": "43yj3pe",
       "name": "A-Frame - MZ01 / Mezanino 2,4M",
@@ -730,7 +796,7 @@ let state={
             "type": "janela",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "JANELA MAXIM-AR 2 FOLHAS",
+            "name": "MAXIM-AR 2 FOLHAS 100CMX100CM",
             "showName": true
           },
           {
@@ -739,7 +805,7 @@ let state={
             "type": "janela",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "JANELA BANHEIRO MAXIM-AR",
+            "name": "MAXIM-AR 50X50CM",
             "showName": true
           }
         ]
@@ -820,7 +886,7 @@ let state={
             "type": "porta_giro",
             "opens": "dentro",
             "hinge": "direita",
-            "name": "JANELA MAXIM-AR 2 FOLHAS",
+            "name": "PORTA EXTERNA 80CM",
             "showName": true
           },
           {
@@ -829,7 +895,7 @@ let state={
             "type": "janela",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "JANELA BANHEIRO MAXIM-AR",
+            "name": "MAXIM-AR 50X50CM",
             "showName": true
           }
         ]
@@ -914,7 +980,7 @@ let state={
             "type": "janela",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "JAN. MAXIM-AR 3 FOLHAS",
+            "name": "MAXIM-AR 3 FOLHAS 180CMX100CM",
             "showName": true
           }
         ]
@@ -998,7 +1064,7 @@ let state={
             "type": "porta_correr",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "PORTA JANELA 3 FOLHAS CORRER",
+            "name": "PORTA JANELA 2 FOLHAS CORRER + 1 FIXA (180X210CM)",
             "showName": true
           }
         ]
@@ -1275,6 +1341,42 @@ let state={
         },
         {
           "produtoNome": "PC16 / PAREDE INT. - FECHADA - LAMINA",
+          "condicao": "padrao",
+          "qty": 1
+        }
+      ],
+      "possuiPossibilidadeOitao": false,
+      "nomeOitao": "",
+      "oitaoDefaultAtivo": false
+    },
+    {
+      "id": "escada_sd_cp",
+      "name": "Cabana - EC01 / Escada Santos Dumont Patamar",
+      "w": 0.65,
+      "d": 1.38,
+      "color": "#CFC8B8",
+      "isStair": true,
+      "patamar": true,
+      "patamarComprimento": 1.4,
+      "hwall": null,
+      "mezanino": null,
+      "lamina": null,
+      "defaultRot": 270,
+      "defaultWalls": {
+        "l": "none",
+        "r": "none"
+      },
+      "lockWalls": true,
+      "tabIds": [
+        "geral",
+        "3eyrz0l"
+      ],
+      "wallThick": 0.1,
+      "lateralEsq": null,
+      "rede": null,
+      "bomConfig": [
+        {
+          "produtoNome": "EC01 / ESCADA SANTOS DUMONT PATAMAR COM CORRIMAO",
           "condicao": "padrao",
           "qty": 1
         }
@@ -1570,7 +1672,7 @@ let state={
             "type": "janela",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "JANELA MAXIM-AR 2 FOLHAS",
+            "name": "MAXIM-AR 2 FOLHAS 100CMX100CM",
             "showName": true
           },
           {
@@ -1579,7 +1681,7 @@ let state={
             "type": "janela",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "JANELA BANHEIRO MAXIM-AR",
+            "name": "MAXIM-AR 50X50CM",
             "showName": true
           }
         ]
@@ -1674,7 +1776,7 @@ let state={
             "type": "porta_giro",
             "opens": "dentro",
             "hinge": "direita",
-            "name": "JANELA MAXIM-AR 2 FOLHAS",
+            "name": "PORTA EXTERNA 80CM",
             "showName": true
           },
           {
@@ -1683,7 +1785,7 @@ let state={
             "type": "janela",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "JANELA BANHEIRO MAXIM-AR",
+            "name": "MAXIM-AR 50X50CM",
             "showName": true
           }
         ]
@@ -1778,7 +1880,7 @@ let state={
             "type": "janela",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "JAN. MAXIM-AR 3 FOLHAS",
+            "name": "MAXIM-AR 3 FOLHAS 180CMX100CM",
             "showName": true
           },
           {
@@ -1886,7 +1988,7 @@ let state={
             "type": "porta_correr",
             "opens": "fora",
             "hinge": "esquerda",
-            "name": "PORTA JANELA 3 FOLHAS CORRER",
+            "name": "PORTA JANELA 2 FOLHAS CORRER + 1 FIXA (180X210CM)",
             "showName": true
           },
           {
@@ -2621,6 +2723,43 @@ let state={
       "possuiPossibilidadeOitao": false,
       "nomeOitao": "",
       "oitaoDefaultAtivo": false
+    },
+    {
+      "id": "escada_sd_sp",
+      "name": "EC04 / Escada Santos Dumont Simples",
+      "w": 0.65,
+      "d": 1.38,
+      "color": "#CFC8B8",
+      "isStair": true,
+      "patamar": false,
+      "patamarComprimento": 0,
+      "hwall": null,
+      "mezanino": null,
+      "lamina": null,
+      "defaultRot": 0,
+      "defaultWalls": {
+        "l": "none",
+        "r": "none"
+      },
+      "lockWalls": true,
+      "tabIds": [
+        "geral",
+        "ok68q7e",
+        "3eyrz0l"
+      ],
+      "wallThick": 0.1,
+      "lateralEsq": null,
+      "rede": null,
+      "bomConfig": [
+        {
+          "produtoNome": "EC04 / ESCADA SANTOS DUMONT SIMPLES COM CORRIMÃO",
+          "condicao": "padrao",
+          "qty": 1
+        }
+      ],
+      "possuiPossibilidadeOitao": false,
+      "nomeOitao": "",
+      "oitaoDefaultAtivo": false
     }
   ],
   "panels": [],
@@ -3085,6 +3224,7 @@ let view={scale:46,tx:0,ty:0};
 let tool="select", armedType=null, armedWallType=null, selId=null;
 let selIds=new Set(); // multi-seleção com Ctrl
 let dimDraftP1=null, dimDraftP2=null, dimHoverPt=null, dimMousePt=null, dimDraftAxis=null;
+let setLeaderAnchorMode=null; // id do rótulo aguardando clique no canvas para definir a âncora da linha de chamada
 let lastLabelClick=null;
 // Snap targets for the manual dimension tool: every piso/mezanino corner,
 // the lateral walls of each piso (including their inner face), any internal
@@ -3238,8 +3378,17 @@ function typeOf(id){return state.types.find(t=>t.id===id);}
 function isMez(ty){return !!(ty&&ty.mezanino);}
 // Total footprint depth of a type: marrom (ty.d) plus the mezanino's wall thickness, if any.
 function footD(ty){return ty?(ty.d+(isMez(ty)?ty.mezanino.th:0)):0;}
+// Comprimento do patamar de uma escada, para esta instância específica: usa o
+// valor salvo na instância (editável no canvas), caindo para o padrão
+// cadastrado no tipo quando ausente. Independente do comprimento da corrida
+// (ty.d), que é sempre só a parte "sobe" da escada.
+function stairPatamarLen(p){
+  const ty=typeOf(p.typeId);
+  if(!ty||!ty.isStair||!ty.patamar) return 0;
+  return Math.max(0.3, p.patamarLen!=null?p.patamarLen:(ty.patamarComprimento||0.9));
+}
 function dims(p){const ty=typeOf(p.typeId);if(!ty)return{w:0,h:0};
-  const D=footD(ty);
+  const D=footD(ty)+(ty.isStair?stairPatamarLen(p):0);
   return (p.rot%180===0)?{w:ty.w,h:D}:{w:D,h:ty.w};}
 function rectOf(p){const d=dims(p);return{x:p.cx-d.w/2,y:p.cy-d.h/2,w:d.w,h:d.h};}
 const snap=v=>Math.round(v/SNAP)*SNAP;
@@ -3515,6 +3664,9 @@ function pisoParts(p){
     const[wly0]=mezWallYRange(ty);
     const p1 = getRotatedSubRect(p, -D/2, wly0-(-D/2));
     rects.push({...p1, fill: WOOD_L, floor:true});
+  } else if(ty && ty.isStair){
+    // ── Escada Santos Dumont: corpo em concreto claro; detalhes abaixo ────
+    rects.push({x:r.x,y:r.y,w:r.w,h:r.h,fill:"#CFC8B8", floor:true});
   } else {
     rects.push({x:r.x,y:r.y,w:r.w,h:r.h,fill:ty?ty.color:WOOD_L, floor:true});
   }
@@ -3561,6 +3713,66 @@ function pisoParts(p){
   mezEsqRects(p).forEach(r=>rects.push(r));
   if(ty.lamina){const lr=getLocalSubRect(p,ty.lamina.lx,ty.lamina.ly,ty.lamina.lw,ty.lamina.lh);rects.push({...lr,fill:"#FFFFFF",isLamina:true});}
   const nm=p.name||{};
+
+  // ── Escada Santos Dumont: degraus, longarinas, patamar e seta de subida ──
+  if(ty && ty.isStair){
+    const paths=[];
+    const hasPatamar = !!ty.patamar;
+    // ty.d é APENAS o comprimento da parte "sobe" (corrida com degraus).
+    // O patamar é uma medida independente — mudar seu comprimento não afeta
+    // a corrida, apenas estende/reduz o footprint total da escada.
+    const corridaLen = ty.d;
+    const patamarLen = hasPatamar ? stairPatamarLen(p) : 0;
+    const totalD = corridaLen + patamarLen; // footprint total local (= r.h após rotação)
+    const stepTread = 0.28; // profundidade padrão do degrau (m)
+    const totalSteps = Math.max(3, Math.round(corridaLen/stepTread));
+    const actualStep = corridaLen/totalSteps;
+    const inset = Math.min(0.035, ty.w*0.12);
+
+    // Longarinas laterais (vigas de borda) — faixas sólidas contínuas em toda a extensão
+    rects.push({...getLocalSubRect(p, -ty.w/2, -totalD/2, inset, totalD), fill:"#8A8272"});
+    rects.push({...getLocalSubRect(p,  ty.w/2-inset, -totalD/2, inset, totalD), fill:"#8A8272"});
+
+    // Patamar sólido — concreto maciço, sem linhas de degrau, no fim da corrida
+    if(hasPatamar){
+      rects.push({...getLocalSubRect(p, -ty.w/2, totalD/2-patamarLen, ty.w, patamarLen), fill:"#A39A88"});
+    }
+
+    // Linhas de degrau (espelhos), no trecho de corrida — usa dimensões
+    // LOCAIS com uma única rotação via rotPoint, para ficar correto em
+    // qualquer rotação (0/90/180/270).
+    for(let i=0;i<=totalSteps;i++){
+      const ly=-totalD/2+i*actualStep;
+      const p1=rotPoint(-ty.w/2+inset, ly, p.rot);
+      const p2=rotPoint( ty.w/2-inset, ly, p.rot);
+      paths.push({kind:"line",
+        p1:[p.cx+p1[0], p.cy+p1[1]],
+        p2:[p.cx+p2[0], p.cy+p2[1]],
+        stroke: i===0 ? "rgba(255,255,255,0.9)" : "rgba(60,55,45,0.55)",
+        sw: i===0 ? 2 : 1});
+    }
+
+    // Contorno do patamar (traço mais forte separando-o da corrida)
+    if(hasPatamar){
+      const pyTop=totalD/2-patamarLen;
+      const ptl=rotPoint(-ty.w/2, pyTop, p.rot), ptr=rotPoint(ty.w/2, pyTop, p.rot);
+      paths.push({kind:"line",p1:[p.cx+ptl[0],p.cy+ptl[1]],p2:[p.cx+ptr[0],p.cy+ptr[1]],stroke:"rgba(255,255,255,0.9)",sw:2});
+    }
+
+    // Seta "SOBE" indicando o sentido de subida, ao longo do eixo central
+    const cyLocalStart = -totalD/2 + actualStep*0.6;
+    const cyLocalEnd   = totalD/2 - patamarLen - actualStep*0.6;
+    if(cyLocalEnd > cyLocalStart){
+      const a1=rotPoint(0, cyLocalStart, p.rot);
+      const a2=rotPoint(0, cyLocalEnd,   p.rot);
+      paths.push({kind:"arrow", p1:[p.cx+a1[0],p.cy+a1[1]], p2:[p.cx+a2[0],p.cy+a2[1]], stroke:"#3A362E", sw:1.6});
+      const tmid=rotPoint(0, (cyLocalStart+cyLocalEnd)/2, p.rot);
+      paths.push({kind:"text", pos:[p.cx+tmid[0], p.cy+tmid[1]], text:"SOBE", fontSize:8, fill:"#3A362E"});
+    }
+
+    return{rects,paths,name:{x:p.cx+(nm.dx||0),y:p.cy+(nm.dy||0),text:nm.text||"",show:nm.show!==false}};
+  }
+
   const paths=[...internalEsqPaths(p),...mezEsqPaths(p)];
   return{rects,paths,name:{x:p.cx+(nm.dx||0),y:p.cy+(nm.dy||0),text:nm.text||"",show:nm.show!==false}};
 }
@@ -3745,7 +3957,7 @@ function appendPaths(target,paths,textSink){
         textSink.push({sx,sy,text:pd.text||"",fontSize:pd.fontSize||10,fill:pd.fill||"#1C1F24"});
       } else {
         const[sx,sy]=toScreen(pd.pos[0],pd.pos[1]);
-        const t=el("text",{x:sx,y:sy,fill:pd.fill||"#1C1F24","font-size":pd.fontSize||10,"font-family":"Montserrat, sans-serif","font-weight":600,"text-anchor":"middle"});
+        const t=el("text",{x:sx,y:sy,fill:pd.fill||"#1C1F24","font-size":pd.fontSize||10,"font-family":"Montserrat, sans-serif","font-weight":600,"text-anchor":"middle",style:"pointer-events:none"});
         t.textContent=pd.text||"";
         target.appendChild(t);
       }
@@ -3866,7 +4078,8 @@ function wallScreenBoxes(){
 function boxesOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 function drawEsqTexts(items, preBlocked=[]){
   if(!items.length)return;
-  const g=el("g",{"data-esqtexts":"1"});
+  // pointer-events:none → cliques passam para os elementos de piso/parede abaixo
+  const g=el("g",{"data-esqtexts":"1",style:"pointer-events:none"});
   const wBoxes=wallScreenBoxes();
   layoutEsqTexts(items, preBlocked).forEach(it=>{
     const lineH=(it.fontSize||10)+2;
@@ -3879,11 +4092,7 @@ function drawEsqTexts(items, preBlocked=[]){
       if(!wBoxes.some(b=>boxesOverlap(box,b)))break;
       cy+=lineH;
     }
-    // When the label had to move away from the esquadria (in any
-    // direction — up, down, or sideways — and/or the wall-avoidance nudge
-    // above), draw a thin leader line back to the esquadria's own anchor
-    // point so the association stays clear even when the text can't sit
-    // right on top of it.
+    // Leader line: drawn only when the label had to move away from the anchor.
     if(Math.hypot(cx-origSx,cy-origSy)>4){
       g.appendChild(el("line",{
         x1:origSx,y1:origSy,x2:cx,y2:cy-(it.fontSize||10)*0.4,
@@ -3922,6 +4131,18 @@ function render(){
   svg.appendChild(g);
 
   const esqTextSink=[], oitaoScreenBoxes=[];
+  // Bounding boxes (tela) das cotas manuais — calculadas ANTES do
+  // posicionamento dos textos de esquadria, para que o texto nunca pouse
+  // em cima de uma cota (mesmo princípio usado para os oitões).
+  const manualDimScreenBoxes=(state.manualDims||[]).map(d=>{
+    const{lineP1:q1,lineP2:q2,len}=dimAxisGeom(d.p1,d.p2,d.axis,d.linePos);
+    const[sx1,sy1]=toScreen(q1[0],q1[1]);
+    const[sx2,sy2]=toScreen(q2[0],q2[1]);
+    const mx=(sx1+sx2)/2, my=(sy1+sy2)/2;
+    const label=fmt(len)+" m";
+    const w=tw_(label)+6;
+    return{x1:mx-w/2-2, y1:my-11, x2:mx+w/2+2, y2:my+6};
+  });
   let svgDefs=el("defs"); svg.appendChild(svgDefs);
 
   state.panels.forEach(p=>{
@@ -3963,16 +4184,15 @@ function render(){
         grp.appendChild(trama);
       }
     }
-    // ── Oitão: seta indicativa + nome (instâncias com oitaoAtivo) ─────────
+    // Oitão coletado em oitaoScreenBoxes aqui (para posicionamento de labels),
+    // mas desenhado em 2ª passagem após todos os pisos/paredes (Fix 2).
     if(p.oitaoAtivo&&tyR&&tyR.possuiPossibilidadeOitao){
-      const r=rectOf(p);
-      // Âncora = ponto médio da face exterior do hwall em coordenadas-mundo, considerando a rotação
       let _owx, _owy;
       if(tyR.hwall){
         const _th=tyR.hwall.th, _dk=tyR.hwall.deck, _d=tyR.d, _W=tyR.w;
         const [_lxS,_lxE]=hwallLocalXRange(tyR.hwall,_W);
-        const _midLx=(_lxS+_lxE)/2;          // X local centro-relativo
-        const _ly0=_d/2-_dk-_th;              // face exterior do hwall (lado do piso)
+        const _midLx=(_lxS+_lxE)/2;
+        const _ly0=_d/2-_dk-_th;
         const [_rx,_ry]=rotPoint(_midLx,_ly0,p.rot);
         _owx=p.cx+_rx; _owy=p.cy+_ry;
       } else {
@@ -3980,34 +4200,14 @@ function render(){
         _owx=_r.x+_r.w/2; _owy=_wr?_wr.y:_r.y;
       }
       const [ax,ay]=toScreen(_owx,_owy);
-      // Direção outward: normal da face exterior em espaço local é (0,-1), rotaciona com o painel
       const [onx,ony]=rotPoint(0,-1,p.rot);
       const aw=10, ah=10;
-      const apx=ax+onx*ah, apy=ay+ony*ah;   // apex da seta
-      // Registra a bounding box do oitão para que os labels de esquadria o evitem
+      const apx=ax+onx*ah, apy=ay+ony*ah;
       const _nw=tyR.nomeOitao?tyR.nomeOitao.length*5.5:0;
       oitaoScreenBoxes.push({
         x1:Math.min(ax,apx)-aw/2-6, y1:Math.min(ay,apy)-aw/2-6,
         x2:Math.max(ax,apx)+aw/2+_nw+6, y2:Math.max(ay,apy)+aw/2+(_nw>0?10:0)+6
       });
-      // Triângulo: apex na direção outward, base perpendicular
-      const arrow=el("polygon",{
-        points:`${apx},${apy} ${ax-ony*aw/2},${ay+onx*aw/2} ${ax+ony*aw/2},${ay-onx*aw/2}`,
-        fill:"#1f331b", stroke:"#fff", "stroke-width":"0.8",
-        "vector-effect":"non-scaling-stroke", style:"pointer-events:none"
-      });
-      grp.appendChild(arrow);
-      if(tyR.nomeOitao){
-        const ot=el("text",{
-          x:apx+(-ony)*6, y:apy+onx*6+3,
-          fill:"#1f331b", stroke:"rgba(255,255,255,0.85)", "stroke-width":"3", "paint-order":"stroke fill",
-          "font-family":"'Montserrat',sans-serif",
-          "font-size":"9", "font-weight":"700",
-          style:"pointer-events:none"
-        });
-        ot.textContent=tyR.nomeOitao;
-        grp.appendChild(ot);
-      }
     }
     if(parts.name.show&&parts.name.text){const[nx,ny]=toScreen(parts.name.x,parts.name.y);
       const ng=el("g",{"data-name":p.id,style:"cursor:move"});
@@ -4045,19 +4245,79 @@ function render(){
       x2:sx+aw/2+_nw+6, y2:sy+6
     });
   });
-  drawEsqTexts(esqTextSink, oitaoScreenBoxes);
+  drawEsqTexts(esqTextSink, [...oitaoScreenBoxes, ...manualDimScreenBoxes]);
 
-  state.labels.forEach(l=>{const[sx,sy]=toScreen(l.x,l.y);
+  // ── Fix 2: 2ª passagem — oitões de painéis acima de tudo ──────────────
+  state.panels.forEach(p=>{
+    if(!p.oitaoAtivo) return;
+    const tyR=typeOf(p.typeId);
+    if(!tyR||!tyR.possuiPossibilidadeOitao) return;
+    let _owx, _owy;
+    if(tyR.hwall){
+      const _th=tyR.hwall.th, _dk=tyR.hwall.deck, _d=tyR.d, _W=tyR.w;
+      const [_lxS,_lxE]=hwallLocalXRange(tyR.hwall,_W);
+      const _midLx=(_lxS+_lxE)/2;
+      const _ly0=_d/2-_dk-_th;
+      const [_rx,_ry]=rotPoint(_midLx,_ly0,p.rot);
+      _owx=p.cx+_rx; _owy=p.cy+_ry;
+    } else {
+      const _r=rectOf(p); const _wr=internalWallRect(p);
+      _owx=_r.x+_r.w/2; _owy=_wr?_wr.y:_r.y;
+    }
+    const [ax,ay]=toScreen(_owx,_owy);
+    const [onx,ony]=rotPoint(0,-1,p.rot);
+    const aw=10, ah=10;
+    const apx=ax+onx*ah, apy=ay+ony*ah;
+    const arrow=el("polygon",{
+      points:`${apx},${apy} ${ax-ony*aw/2},${ay+onx*aw/2} ${ax+ony*aw/2},${ay-onx*aw/2}`,
+      fill:"#1f331b", stroke:"#fff", "stroke-width":"0.8",
+      "vector-effect":"non-scaling-stroke", style:"pointer-events:none"
+    });
+    svg.appendChild(arrow);
+    if(tyR.nomeOitao){
+      const ot=el("text",{
+        x:apx+(-ony)*6, y:apy+onx*6+3,
+        fill:"#1f331b", stroke:"rgba(255,255,255,0.85)", "stroke-width":"3", "paint-order":"stroke fill",
+        "font-family":"'Montserrat',sans-serif",
+        "font-size":"9", "font-weight":"700",
+        style:"pointer-events:none"
+      });
+      ot.textContent=tyR.nomeOitao;
+      svg.appendChild(ot);
+    }
+  });
+
+  state.labels.forEach(l=>{
     const lblSel=l.id===selId||selIds.has(l.id);
-    const lg=el("g",{"data-label":l.id,style:"cursor:pointer"});
-    const tw=Math.max(l.text.length*8+18,34);
-    lg.appendChild(el("rect",{x:sx-tw/2,y:sy-11,width:tw,height:20,
-      fill:lblSel?"var(--accent-soft)":"transparent",
-      stroke:lblSel?"var(--accent)":"none","stroke-width":lblSel?1.5:0,
-      "stroke-dasharray":lblSel?"4 2":"none",rx:5}));
-    const t=el("text",{x:sx,y:sy,class:"room-lbl","font-size":15});
-    if(lblSel)t.setAttribute("fill","var(--accent)");
-    t.textContent=l.text;lg.appendChild(t);svg.appendChild(lg);});
+    const lines=(l.text||'').split('\n');
+    const lineH=18;
+    const[sx,sy]=toScreen(l.x,l.y);
+    // Leader line para a âncora (se definida)
+    if(l.leaderAnchor){
+      const[lax,lay]=toScreen(l.leaderAnchor.x,l.leaderAnchor.y);
+      svg.appendChild(el('line',{x1:lax,y1:lay,x2:sx,y2:sy,
+        stroke:lblSel?'var(--accent)':'#7A828C','stroke-width':1,'stroke-dasharray':'3 3',
+        'vector-effect':'non-scaling-stroke',style:'pointer-events:none'}));
+      svg.appendChild(el('circle',{cx:lax,cy:lay,r:3,
+        fill:lblSel?'var(--accent)':'#7A828C',style:'pointer-events:none'}));
+    }
+    const lg=el('g',{'data-label':l.id,style:'cursor:pointer'});
+    const maxLineLen=Math.max(...lines.map(ln=>ln.length));
+    const tw=Math.max(maxLineLen*8+18,34);
+    const th=lines.length*lineH+4;
+    lg.appendChild(el('rect',{x:sx-tw/2,y:sy-lineH+2,width:tw,height:th,
+      fill:lblSel?'var(--accent-soft)':'transparent',
+      stroke:lblSel?'var(--accent)':'none','stroke-width':lblSel?1.5:0,
+      'stroke-dasharray':lblSel?'4 2':'none',rx:5}));
+    const t=el('text',{x:sx,y:sy,class:'room-lbl','font-size':15});
+    if(lblSel)t.setAttribute('fill','var(--accent)');
+    lines.forEach((ln,i)=>{
+      const ts=el('tspan',{x:sx,dy:i===0?0:lineH});
+      ts.textContent=ln;
+      t.appendChild(ts);
+    });
+    lg.appendChild(t);svg.appendChild(lg);
+  });
 
   (state.manualDims||[]).forEach(d=>{
     const sel=d.id===selId||selIds.has(d.id);
@@ -4231,13 +4491,25 @@ function renderSelbar(){
   }
   if(lb){
     bar.classList.add("show");
+    const hasAnchor=!!(lb.leaderAnchor);
     bar.innerHTML=`<span class="lab">rótulo</span>
-      <span class="lab" style="color:#cfd4da">${esc(lb.text)}</span>
+      <span class="lab" style="color:#cfd4da">${esc((lb.text||'').split('\n')[0])}</span>
       <span class="sep"></span>
       <button id="lRen">✎ Editar texto</button>
+      <button id="lAnchor" class="${hasAnchor?'on':''}">${hasAnchor?'📍 Remover âncora':'📍 Definir âncora'}</button>
       <button class="del" id="lDel">🗑 Excluir</button>`;
     bar.querySelector("#lRen").onclick=renameLabel;
     bar.querySelector("#lDel").onclick=delSel;
+    bar.querySelector("#lAnchor").onclick=()=>{
+      if(lb.leaderAnchor){
+        // Remove âncora
+        saveState(); lb.leaderAnchor=null; render(); renderSelbar();
+      } else {
+        // Ativa modo de definição de âncora
+        setLeaderAnchorMode=lb.id;
+        toast('📍 Clique no canvas para definir o ponto de âncora da linha de chamada.');
+      }
+    };
     return;
   }
   if(wi){
@@ -4294,10 +4566,9 @@ function renderSelbar(){
   
   const wl = (!w.l || w.l === 'none');
   const wr = (!w.r || w.r === 'none');
-  
-  bar.innerHTML=`<span class="lab">nome</span>
-    <button id="nShow" class="${nm.show!==false?'on':''}">${nm.show!==false?'visível':'oculto'}</button>
-    <button id="nRen">renomear</button>
+  const isStairPanel = !!(pty && pty.isStair);
+
+  const wallsCornersHtml = isStairPanel ? '' : `
     <span class="sep"></span>
     <span class="lab">paredes${wallsLocked?' 🔒':''}</span>
     <button class="cstate" data-side="l" ${wallsLocked?'disabled title="Paredes laterais bloqueadas para este modelo"':''}>Esq: ${WLAB[w.l||'none']}</button>
@@ -4307,7 +4578,12 @@ function renderSelbar(){
     <button class="corner ${c.tl?'on':''}" data-c="tl" title="superior esquerdo" ${wl?'':'disabled'}>◰</button>
     <button class="corner ${c.tr?'on':''}" data-c="tr" title="superior direito" ${wr?'':'disabled'}>◳</button>
     <button class="corner ${c.bl?'on':''}" data-c="bl" title="inferior esquerdo" ${wl?'':'disabled'}>◱</button>
-    <button class="corner ${c.br?'on':''}" data-c="br" title="inferior direito" ${wr?'':'disabled'}>◲</button>
+    <button class="corner ${c.br?'on':''}" data-c="br" title="inferior direito" ${wr?'':'disabled'}>◲</button>`;
+
+  bar.innerHTML=`<span class="lab">nome</span>
+    <button id="nShow" class="${nm.show!==false?'on':''}">${nm.show!==false?'visível':'oculto'}</button>
+    <button id="nRen">renomear</button>
+    ${wallsCornersHtml}
     <span class="sep"></span>
     <button id="sRotate">↻ Girar</button>
     <button id="sDup">⧉ Duplicar</button>
@@ -4316,7 +4592,7 @@ function renderSelbar(){
   bar.querySelector("#nShow").onclick=()=>{saveState(); p.name=p.name||{};p.name.show=!(p.name.show!==false);render();};
   bar.querySelector("#nRen").onclick=()=>renameSel();
   
-  if(!wallsLocked)bar.querySelectorAll("[data-side]").forEach(b=>b.onclick=()=>{
+  if(!isStairPanel && !wallsLocked)bar.querySelectorAll("[data-side]").forEach(b=>b.onclick=()=>{
     saveState();
     p.walls=p.walls||{};
     const k=b.dataset.side;p.walls[k]=WALLCYCLE[(WALLCYCLE.indexOf(p.walls[k]||"none")+1)%3];
@@ -4359,6 +4635,22 @@ function renderSelbar(){
     oBtn.onclick=()=>{saveState();p.oitaoAtivo=!p.oitaoAtivo;render();renderSelbar();};
     bar.appendChild(oBtn);
   }
+
+  // ── Escada: comprimento do patamar, editável por instância no canvas ───
+  // (o valor cadastrado no tipo funciona como padrão inicial ao posicionar)
+  if(pty&&pty.isStair&&pty.patamar){
+    const sep2=document.createElement("span");sep2.className="sep";bar.appendChild(sep2);
+    const sLab=document.createElement("span");sLab.className="lab";sLab.textContent="patamar (m)";bar.appendChild(sLab);
+    const sInp=document.createElement("input");
+    sInp.type="number";sInp.step="0.05";sInp.min="0.3";
+    sInp.value=(p.patamarLen!=null?p.patamarLen:(pty.patamarComprimento||0.9)).toFixed(2);
+    sInp.style.cssText="width:62px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:6px;color:#fff;font-size:12px;padding:5px 6px;font-family:var(--mono)";
+    sInp.onchange=()=>{
+      const v=Math.max(0.3, parseFloat(sInp.value)||pty.patamarComprimento||0.9);
+      saveState(); p.patamarLen=v; render(); renderSelbar();
+    };
+    bar.appendChild(sInp);
+  }
 }
 
 function renameSel(){const p=state.panels.find(p=>p.id===selId);if(!p)return;
@@ -4388,7 +4680,7 @@ function renameLabel(){
     saveState();
     l.text=(txt||"").trim()||orig;
     render();
-  });
+  },true);
 }
 
 let editingWallType=null;
@@ -4729,8 +5021,9 @@ function renderInv(){
   const inv=document.getElementById("inv");inv.innerHTML="";
   
   const currentTypes = state.types.filter(t => t.tabIds && t.tabIds.includes(state.activeTab));
-  const floorTypes = currentTypes.filter(t=>!isMez(t)).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt'));
+  const floorTypes = currentTypes.filter(t=>!isMez(t)&&!t.isStair).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt'));
   const mezTypes = currentTypes.filter(t=>isMez(t)).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt'));
+  const stairTypes = currentTypes.filter(t=>t.isStair).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt'));
 
   const renderTypeCard=(ty)=>{
     const used=usedCount(ty.id);
@@ -4742,9 +5035,12 @@ function renderInv(){
       ? `background: linear-gradient(180deg, ${WOOD_L} 50%, ${WOOD_D} 50%)`
       : `background: ${WOOD_L}`;
     if (isMez(ty)) swatchStyle = `background: linear-gradient(180deg, ${WOOD_L} 78%, #1C1F24 78%)`;
+    if (ty.isStair) swatchStyle = `background: repeating-linear-gradient(180deg, #CFC8B8 0, #CFC8B8 3px, #8A8272 3px, #8A8272 4px)`;
     const D=footD(ty);
     const dimsTxt = isMez(ty)
       ? `${fmt(ty.w)} × ${fmt(ty.d)} m (marrom) + ${fmt(ty.mezanino.th)} m parede · total ${fmt(D)} m · ${fmt(ty.w*ty.d)} m²`
+      : ty.isStair
+      ? `${fmt(ty.w)} × ${fmt(ty.d)} m${ty.patamar?` · patamar ${fmt(ty.patamarComprimento||0.9)} m`:' · sem patamar'}`
       : `${fmt(ty.w)} × ${fmt(ty.d)} m · ${fmt(ty.w*ty.d)} m²`;
     const precoUnit=getPriceForType(ty.name);
     const priceBadge=precoUnit!==null
@@ -4754,7 +5050,7 @@ function renderInv(){
       <button class="mini" data-dup="${ty.id}" title="Duplicar tipo">⧉</button>
       <button class="mini" data-edit="${ty.id}">editar</button>`:'';
     card.innerHTML=`<div class="row1"><span class="swatch" style="${swatchStyle}"></span>
-      <span class="pname">${isMez(ty)?"🏗 ":""}${esc(ty.name)}</span>
+      <span class="pname">${isMez(ty)?"🏗 ":ty.isStair?"🪜 ":""}${esc(ty.name)}</span>
       ${adminBtns}</div>
       <div class="dims">${dimsTxt}</div>
       ${priceBadge}
@@ -4768,8 +5064,10 @@ function renderInv(){
       });
     }
     if(isAdmin()){
-      card.querySelector("[data-edit]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openTypeModal(ty.id));});
-      card.querySelector("[data-dup]")?.addEventListener("click",e=>{e.stopPropagation();requireAdmin(()=>openTypeModal(null,false,ty.id));});
+      card.querySelector("[data-edit]")?.addEventListener("click",e=>{e.stopPropagation();
+        requireAdmin(()=> ty.isStair ? openStairModal(ty.id) : openTypeModal(ty.id));});
+      card.querySelector("[data-dup]")?.addEventListener("click",e=>{e.stopPropagation();
+        requireAdmin(()=> ty.isStair ? openStairModal(null,ty.id) : openTypeModal(null,false,ty.id));});
     }
     inv.appendChild(card);
   };
@@ -4797,6 +5095,21 @@ function renderInv(){
     addMez.style.margin="4px";
     addMez.onclick=()=>requireAdmin(()=>openTypeModal(null,true));
     inv.appendChild(addMez);
+  }
+
+  const stairHead=document.createElement("div");
+  stairHead.style.cssText="margin:14px 4px 4px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:700";
+  stairHead.textContent="Escadas disponíveis";
+  inv.appendChild(stairHead);
+
+  stairTypes.forEach(renderTypeCard);
+
+  if(state.activeTab === 'geral' && isAdmin()){
+    const addStair=document.createElement("button");
+    addStair.className="add-type";addStair.textContent="+ Adicionar escada";
+    addStair.style.margin="4px";
+    addStair.onclick=()=>requireAdmin(()=>openStairModal(null));
+    inv.appendChild(addStair);
   }
 
   const wallHead=document.createElement("div");
@@ -4887,6 +5200,19 @@ svg.addEventListener("pointerdown",ev=>{
 
   if(ev.button===1){drag={kind:"pan",sx:ev.clientX,sy:ev.clientY,tx:view.tx,ty:view.ty,hasMoved:false};svg.classList.add("panning");render();return;}
   const[wx,wy]=toWorld(ev.clientX, ev.clientY);
+  // ── Linha de chamada (âncora) de rótulo: aguarda o próximo clique no
+  // canvas para fixar o ponto, independente da ferramenta ativa ─────────
+  if(setLeaderAnchorMode){
+    const lb=state.labels.find(l=>l.id===setLeaderAnchorMode);
+    setLeaderAnchorMode=null;
+    if(lb){
+      saveState();
+      lb.leaderAnchor={x:wx,y:wy};
+      render();renderSelbar();
+      toast("📍 Âncora da linha de chamada definida.");
+    }
+    return;
+  }
   if(tool==="place"&&armedType){placeAt(wx,wy);return;}
   if(tool==="label"){addLabel(wx,wy);return;}
   if(tool==="dim"){
@@ -5341,7 +5667,8 @@ function placeAt(wx,wy){
   state.panels.push({id:uid(),typeId:armedType,cx,cy,rot:ghostRot,
     walls:{l:dw.l||"solid",r:dw.r||"solid"},corners:{tl:false,tr:false,bl:false,br:false},
     name:{text:ty.name,dx:0,dy:0,show:false},
-    oitaoAtivo:!!(ty.possuiPossibilidadeOitao&&ty.oitaoDefaultAtivo)});
+    oitaoAtivo:!!(ty.possuiPossibilidadeOitao&&ty.oitaoDefaultAtivo),
+    patamarLen:(ty.isStair&&ty.patamar)?(ty.patamarComprimento||0.9):undefined});
   renderTabs();renderInv();render();}
 
 // Returns an error message if the wall is incompatible with the floor restriction, or null if OK.
@@ -5379,10 +5706,10 @@ function placeWallAt(wx,wy){
 function addLabel(wx,wy){openTextModal("Novo rótulo de ambiente","Ambiente",txt=>{
   if(txt&&txt.trim()) {
     saveState(); 
-    const l={id:uid(),x:snap(wx),y:snap(wy),text:txt.trim()};
+    const l={id:uid(),x:snap(wx),y:snap(wy),text:txt,leaderAnchor:null};
     state.labels.push(l);selId=l.id;
   }
-  tool="select";setTool();renderInv();render();});}
+  tool="select";setTool();renderInv();render();},true);}
 
 svg.addEventListener("wheel",ev=>{ev.preventDefault();
   const r=svg.getBoundingClientRect();const mx=ev.clientX-r.left,my=ev.clientY-r.top;
@@ -6072,13 +6399,208 @@ function saveType(defaultWalls){
   closeModal();renderInv();render();
 }
 
-function openTextModal(title,initial,cb){
-  modalBody.innerHTML=`<h3>${esc(title)}</h3><div class="field"><label>Texto</label><input id="t_in" value="${esc(initial)}"></div>
+// ════════════════════════════════════════════════════════════════════════
+// ESCADA — categoria própria (semelhante a Piso / Mezanino / Parede)
+// ════════════════════════════════════════════════════════════════════════
+let editingStairType=null, stairBomRows=[];
+function getStairBomConditions(){
+  return [
+    {v:"padrao",              l:"Padrão / Sempre"},
+    {v:"escada_com_patamar",  l:"Se este modelo TEM patamar"},
+    {v:"escada_sem_patamar",  l:"Se este modelo NÃO tem patamar"},
+  ];
+}
+function openStairModal(id, cloneFrom){
+  editingStairType = id ? state.types.find(t=>t.id===id) : null;
+  const src = (!editingStairType && cloneFrom) ? state.types.find(t=>t.id===cloneFrom) : null;
+  let t;
+  if(editingStairType) t=editingStairType;
+  else if(src) t={...src, name:"Cópia de "+src.name};
+  else t={name:"", w:0.80, d:2.40, defaultRot:0, patamar:false, patamarComprimento:0.9, tabIds:["geral"]};
+
+  const titleStr = id ? "Editar escada" : src ? `Duplicar: ${esc(src.name)}` : "Nova escada (Santos Dumont)";
+  stairBomRows = JSON.parse(JSON.stringify(t.bomConfig||[]));
+  const prodOptions = (pricingData?.produtos||[])
+    .map(pr=>`<option value="${esc(pr.nome)}">${esc(pr.nome)}</option>`).join('');
+  const condOptions = getStairBomConditions().map(c=>`<option value="${c.v}">${c.l}</option>`).join('');
+
+  modalBody.innerHTML=`<h3>${titleStr}</h3>
+
+    <!-- Exibir nas abas -->
+    <div class="field" style="margin-bottom:8px"><label>Exibir nas abas:</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;padding:4px 0;">
+        ${(state.tabs||[{id:'geral',name:'Geral'}]).map(tab=>`
+          <label style="display:flex;align-items:center;gap:4px;font-weight:600;text-transform:none;font-size:12px;">
+            <input type="checkbox" class="tab-cb" value="${tab.id}" ${(t.tabIds||['geral']).includes(tab.id)?'checked':''} ${tab.id==='geral'?'disabled checked':''} style="width:auto;margin:0;">
+            ${esc(tab.name)}
+          </label>`).join("")}
+      </div>
+    </div>
+
+    <details class="tm-section" open>
+      <summary>🪜 Informações Básicas</summary>
+      <div class="tm-body">
+        <div class="field"><label>Nome do painel</label><input id="fs_name" value="${esc(t.name)}" placeholder="ex: Escada Santos Dumont (Com patamar)"></div>
+        <div class="two">
+          <div class="field"><label>Largura (m)</label><input id="fs_w" type="number" step="0.01" value="${t.w}"></div>
+          <div class="field"><label>Comprimento da corrida — parte "sobe" (m)</label><input id="fs_d" type="number" step="0.01" value="${t.d}"></div>
+        </div>
+        <p class="sub" style="margin:4px 0 0">O comprimento acima é só o trecho com degraus. O patamar (se houver) é uma medida independente, configurada abaixo — alterá-lo não muda o tamanho da corrida.</p>
+        <div class="field">
+          <label>Rotação inicial ao posicionar</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button type="button" class="tbtn" id="fs_rot_btn" style="min-width:110px">↻ <span id="fs_rot_val">${t.defaultRot||0}°</span></button>
+            <span class="sub" style="margin:0">Toda vez que você for posicionar esta escada, ela já começa girada assim.</span>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="tm-section" open>
+      <summary>🧱 Patamar</summary>
+      <div class="tm-body">
+        <div class="field" style="margin-bottom:4px">
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);font-weight:600">
+            <input type="checkbox" id="fs_patamar_chk" style="width:auto;margin:0" ${t.patamar?"checked":""}> Possui patamar (bloco sólido no topo da escada)
+          </label>
+        </div>
+        <div class="field" id="fs_patamar_len_box" style="${t.patamar?"":"display:none"}">
+          <label>Comprimento do patamar — padrão (m)</label>
+          <input id="fs_patamar_len" type="number" step="0.05" min="0.3" value="${t.patamarComprimento||0.9}">
+          <p class="sub" style="margin:6px 0 0">Valor usado ao posicionar uma nova escada deste modelo. Depois de posicionada, o comprimento do patamar pode ser ajustado individualmente pela barra de seleção no canvas.</p>
+        </div>
+      </div>
+    </details>
+
+    <details class="tm-section">
+      <summary><span class="bom-title" style="display:inline-flex;align-items:center;gap:6px;width:100%">📦 Composição Real (BOM)
+        <span style="margin-left:auto;display:flex;gap:4px" onclick="event.stopPropagation()">
+          <button type="button" class="tbtn" id="fs_bom_copy" style="font-size:11px;padding:3px 8px" title="Copiar BOM deste painel">📋 Copiar</button>
+          <button type="button" class="tbtn" id="fs_bom_paste" style="font-size:11px;padding:3px 8px" title="Colar BOM copiado">📌 Colar</button>
+        </span>
+      </span></summary>
+      <div class="tm-body">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+          <button type="button" class="tbtn" id="fs_bom_add" style="font-size:11px;padding:3px 8px">+ Produto</button>
+        </div>
+        <div id="fs_bom_list"></div>
+        <p class="sub" style="margin:4px 0 0;font-size:10.5px;color:var(--ink-faint)">Se vazio, o quantitativo usa o nome do painel como produto. Condições lidas no momento do cálculo.</p>
+      </div>
+    </details>
+
+    <div class="modal-actions">${id?'<button class="del-link" id="fs_del">Excluir tipo</button>':''}
+      <button class="tbtn" id="fs_cancel">Cancelar</button><button class="tbtn primary" id="fs_save">Salvar</button></div>`;
+
+  function renderStairBomList(){
+    const list=document.getElementById("fs_bom_list");
+    if(!list)return;
+    list.innerHTML='';
+    stairBomRows.forEach((row,i)=>{
+      const div=document.createElement('div');div.className='bom-row';
+      div.innerHTML=`
+        <select class="bom-prod">${prodOptions}</select>
+        <select class="bom-cond">${condOptions}</select>
+        <input class="bom-qty" type="number" min="0.1" step="0.5" value="${row.qty||1}">
+        <button class="bom-del" data-i="${i}" title="Remover">✕</button>`;
+      div.querySelector('.bom-prod').value=row.produtoNome||'';
+      div.querySelector('.bom-cond').value=row.condicao||'padrao';
+      div.querySelector('.bom-prod').onchange=e=>{stairBomRows[i].produtoNome=e.target.value;};
+      div.querySelector('.bom-cond').onchange=e=>{stairBomRows[i].condicao=e.target.value;};
+      div.querySelector('.bom-qty').onchange=e=>{stairBomRows[i].qty=Math.max(0.1,parseFloat(e.target.value)||1);};
+      div.querySelector('.bom-del').onclick=()=>{stairBomRows.splice(i,1);renderStairBomList();};
+      list.appendChild(div);
+    });
+  }
+  renderStairBomList();
+  document.getElementById("fs_bom_add").onclick=()=>{
+    const firstProd=(pricingData?.produtos||[])[0]?.nome||'';
+    stairBomRows.push({produtoNome:firstProd,condicao:'padrao',qty:1});
+    renderStairBomList();
+  };
+  document.getElementById("fs_bom_copy").onclick=()=>{
+    bomClipboard=JSON.parse(JSON.stringify(stairBomRows));
+    toast("BOM copiado! Cole em outro painel.");
+  };
+  document.getElementById("fs_bom_paste").onclick=()=>{
+    if(!bomClipboard){toastError("Nenhum BOM copiado ainda.");return;}
+    stairBomRows=JSON.parse(JSON.stringify(bomClipboard));
+    renderStairBomList();
+    toast("BOM colado com sucesso.");
+  };
+
+  let curStairRot=t.defaultRot||0;
+  document.getElementById("fs_rot_btn").onclick=()=>{
+    curStairRot=(curStairRot+90)%360;
+    document.getElementById("fs_rot_val").textContent=curStairRot+"°";
+  };
+
+  document.getElementById("fs_patamar_chk").onchange=e=>{
+    document.getElementById("fs_patamar_len_box").style.display=e.target.checked?"":"none";
+  };
+
+  document.getElementById("fs_cancel").onclick=closeModal;
+  document.getElementById("fs_save").onclick=()=>saveStairType(curStairRot);
+  if(id) document.getElementById("fs_del").onclick=()=>{
+    if(usedCount(id)&&!confirm("Há escadas desse tipo na planta. Excluir o tipo e remover as escadas?"))return;
+    state.panels=state.panels.filter(p=>p.typeId!==id);state.types=state.types.filter(t=>t.id!==id);
+    closeModal();renderInv();render();
+  };
+
+  scrim.classList.add("show");setTimeout(()=>document.getElementById("fs_name").focus(),50);
+}
+
+function saveStairType(defaultRot){
+  const name=document.getElementById("fs_name").value.trim()||"Escada";
+  const w=Math.max(0.3,parseFloat(document.getElementById("fs_w").value)||0.8);
+  const d=Math.max(0.5,parseFloat(document.getElementById("fs_d").value)||2.4);
+  const patamar=!!document.getElementById("fs_patamar_chk").checked;
+  const patamarComprimento=patamar
+    ? Math.max(0.3, parseFloat(document.getElementById("fs_patamar_len").value)||0.9)
+    : 0;
+
+  let tabIds = Array.from(document.querySelectorAll('.tab-cb:checked')).map(cb => cb.value);
+  if(!tabIds.includes("geral")) tabIds.push("geral");
+
+  const bomRows=[];
+  document.querySelectorAll("#fs_bom_list .bom-row").forEach(row=>{
+    const prod=row.querySelector(".bom-prod")?.value?.trim();
+    const cond=row.querySelector(".bom-cond")?.value||"padrao";
+    const qty=Math.max(0.1,parseFloat(row.querySelector(".bom-qty")?.value)||1);
+    if(prod) bomRows.push({produtoNome:prod,condicao:cond,qty});
+  });
+  const bomConfig=bomRows.length?bomRows:null;
+
+  const patch={
+    name, w, d, defaultRot, tabIds, bomConfig,
+    isStair:true, patamar, patamarComprimento,
+    color:"#CFC8B8", hwall:null, mezanino:null, lamina:null,
+    defaultWalls:{l:"none",r:"none"}, lockWalls:true,
+    wallThick:0.1, lateralEsq:null, rede:null,
+    possuiPossibilidadeOitao:false, nomeOitao:"", oitaoDefaultAtivo:false,
+  };
+
+  if(editingStairType) Object.assign(editingStairType, patch);
+  else state.types.push({id:uid(), ...patch});
+
+  state.types.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR',{sensitivity:'base'}));
+  closeModal();renderInv();render();
+}
+
+
+function openTextModal(title,initial,cb,multiline){
+  const inputHtml=multiline
+    ?`<textarea id="t_in" rows="4" style="width:100%;resize:vertical;font-family:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)">${esc(initial)}</textarea><p class="sub" style="margin:4px 0 0;font-size:11px">Ctrl+Enter confirma · quebras de linha suportadas</p>`
+    :`<input id="t_in" value="${esc(initial)}">`;
+  modalBody.innerHTML=`<h3>${esc(title)}</h3><div class="field"><label>Texto</label>${inputHtml}</div>
     <div class="modal-actions"><button class="tbtn" id="t_cancel">Cancelar</button><button class="tbtn primary" id="t_ok">OK</button></div>`;
   document.getElementById("t_cancel").onclick=()=>{closeModal();cb(null);};
   document.getElementById("t_ok").onclick=()=>{const v=document.getElementById("t_in").value;closeModal();cb(v);};
-  scrim.classList.add("show");const i=document.getElementById("t_in");setTimeout(()=>{i.focus();i.select();},50);
-  i.addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("t_ok").click();});
+  scrim.classList.add("show");const i=document.getElementById("t_in");
+  setTimeout(()=>{i.focus();if(i.select&&!multiline)i.select();},50);
+  i.addEventListener("keydown",e=>{
+    if(multiline){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();document.getElementById("t_ok").click();}}
+    else{if(e.key==="Enter"){e.preventDefault();document.getElementById("t_ok").click();}}
+  });
 }
 
 document.getElementById("projName").addEventListener("input",e=>state.name=e.target.value);
@@ -6089,7 +6611,20 @@ document.getElementById("btnNew").onclick=()=>{
   document.getElementById("projName").value=state.name;selId=null;
   renderTabs();renderInv();fit();render();};
 
-function serialize(){return{v:5,name:state.name,meta:state.meta,tabs:state.tabs,activeTab:state.activeTab,types:state.types,panels:state.panels,labels:state.labels,wallTypes:state.wallTypes,wallInstances:state.wallInstances,manualDims:state.manualDims||[]};}
+// O logo padrão é um SVG em base64 relativamente grande (~10KB). Como ele já
+// está embutido no próprio app (DEFAULT_LOGO), não faz sentido duplicá-lo
+// dentro de todo JSON salvo (planta, Modelo, ou planta pré-definida) — isso
+// só infla o arquivo à toa. Omitimos o campo quando é igual ao padrão; ao
+// carregar, a ausência do campo já cai de volta no DEFAULT_LOGO. Se algum dia
+// existir upload de logo customizado (diferente do padrão), ele continua
+// sendo salvo normalmente.
+function metaForSave(){
+  const m={...state.meta};
+  if(!m.logo || m.logo===DEFAULT_LOGO) delete m.logo;
+  return m;
+}
+
+function serialize(){return{v:5,name:state.name,meta:metaForSave(),tabs:state.tabs,activeTab:state.activeTab,types:state.types,panels:state.panels,labels:state.labels,wallTypes:state.wallTypes,wallInstances:state.wallInstances,manualDims:state.manualDims||[]};}
 function normalizePanel(p){
   const ty=typeOf(p.typeId);
   let walls=p.walls;
@@ -6098,7 +6633,9 @@ function normalizePanel(p){
   return{id:p.id||uid(),typeId:p.typeId,cx:p.cx,cy:p.cy,rot:p.rot||0,
     walls:{l:walls.l||"solid",r:walls.r||"solid"},
     corners:Object.assign({tl:false,tr:false,bl:false,br:false},p.corners||{}),
-    name:Object.assign({text:ty?ty.name:"Piso",dx:0,dy:0,show:false},p.name||{})};
+    name:Object.assign({text:ty?ty.name:"Piso",dx:0,dy:0,show:false},p.name||{}),
+    oitaoAtivo:!!p.oitaoAtivo,
+    patamarLen:p.patamarLen};
 }
 function normalizeWallType(t){
   let length=t.length, thickness=t.thickness;
@@ -6141,6 +6678,165 @@ document.getElementById("fileInput").onchange=e=>{const f=e.target.files[0];if(!
   const rd=new FileReader();rd.onload=()=>{try{load(JSON.parse(rd.result));}catch(err){alert("Arquivo inválido.");}};
   rd.readAsText(f);e.target.value="";};
 
+// ════════════════════════════════════════════════════════════════════════
+// "MODELO" — salva/importa apenas os dados do PROJETO (painéis posicionados,
+// cotas, aba ativa e o quantitativo atual: ajustes, itens avulsos, desconto
+// e a marcação de insumos "Compra com Indústria"). NÃO inclui o cadastro de
+// tipos (state.types / state.wallTypes / state.tabs) — isso é configuração,
+// não dado de projeto, e permanece intocado ao importar um Modelo.
+// ════════════════════════════════════════════════════════════════════════
+function serializeModelo(){
+  return{
+    kindModelo: "321modular-modelo",
+    v: 1,
+    name: state.name,
+    meta: metaForSave(),
+    activeTab: state.activeTab,
+    panels: state.panels,
+    labels: state.labels,
+    wallInstances: state.wallInstances,
+    manualDims: state.manualDims||[],
+    incluirValorNaPlanta: state.incluirValorNaPlanta!==false,
+    insumoCompraIndustria: state.insumoCompraIndustria||{},
+    // Quantitativo atual (ajustes manuais de quantidade, itens avulsos, desconto)
+    qAjustes: qAjustes,
+    qNovosItens: Array.from(qNovosItens),
+    qNovosInsumos: Array.from(qNovosInsumos),
+    qDesconto: qDesconto,
+  };
+}
+function loadModelo(data){
+  state.name=data.name||state.name;
+  if(data.meta) state.meta={...state.meta, ...data.meta, logo:(data.meta.logo||state.meta.logo||DEFAULT_LOGO)};
+  if(data.activeTab && (state.tabs||[]).some(t=>t.id===data.activeTab)) state.activeTab=data.activeTab;
+  state.panels=(data.panels||[]).map(normalizePanel);
+  state.labels=data.labels||[];
+  state.wallInstances=(data.wallInstances||[]).map(normalizeWallInstance);
+  state.manualDims=(data.manualDims||[]).map(normalizeManualDim);
+  state.incluirValorNaPlanta=data.incluirValorNaPlanta!==false;
+  state.insumoCompraIndustria=data.insumoCompraIndustria||{};
+  qAjustes=data.qAjustes||{};
+  qNovosItens=new Set(data.qNovosItens||[]);
+  qNovosInsumos=new Set(data.qNovosInsumos||[]);
+  qDesconto=data.qDesconto||{tipo:'percent', valor:0};
+  document.getElementById("projName").value=state.name;selId=null;renderTabs();renderInv();fit();render();
+  toast("Modelo importado com sucesso.");
+}
+
+document.getElementById("btnSaveModelo").onclick=()=>{
+  const blob=new Blob([JSON.stringify(serializeModelo(),null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download=(state.name||"modelo").replace(/[^\w\-]+/g,"_")+"_modelo.json";a.click();URL.revokeObjectURL(a.href);};
+document.getElementById("btnImportModelo").onclick=()=>document.getElementById("fileInputModelo").click();
+document.getElementById("fileInputModelo").onchange=e=>{const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();rd.onload=()=>{try{loadModelo(JSON.parse(rd.result));}catch(err){alert("Arquivo de Modelo inválido.");}};
+  rd.readAsText(f);e.target.value="";};
+
+// ════════════════════════════════════════════════════════════════════════
+// PLANTAS PRÉ-DEFINIDAS (Ponto 4) — biblioteca de modelos de planta salva
+// no servidor (aba "Plantas Pré-Definidas" da planilha). Qualquer perfil
+// autenticado pode carregar uma; só o Admin pode cadastrar ou excluir.
+// Usa o mesmo formato do "Modelo" (serializeModelo/loadModelo).
+// ════════════════════════════════════════════════════════════════════════
+document.getElementById("btnPlantasModelo").onclick=abrirPlantasModelo;
+
+async function abrirPlantasModelo(){
+  if(!tokenAtivoSessao){ toastError("Aguardando autenticação."); return; }
+  modalBody.innerHTML=`<h3>📐 Plantas Pré-Definidas</h3>
+    <p class="sub" style="margin:0 0 12px">Carregue um modelo de planta pronto sobre o cadastro atual. Isso substitui os painéis, cotas e o quantitativo do projeto aberto.</p>
+    <div id="pm_list" style="min-height:60px;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-size:13px">Carregando…</div>
+    <div id="pm_save_area"></div>
+    <div class="modal-actions"><button class="tbtn" id="pm_close">Fechar</button></div>`;
+  document.getElementById("pm_close").onclick=closeModal;
+  scrim.classList.add("show");
+
+  let plantas=[];
+  try{
+    const res=await fetch(`${GAS_URL}?token=${encodeURIComponent(tokenAtivoSessao)}&action=listarPlantas`,{cache:"no-store"});
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.erro||"Falha ao listar plantas.");
+    plantas=data.plantas||[];
+  }catch(err){
+    document.getElementById("pm_list").innerHTML=`<p style="color:#c62828;text-align:center">⚠ ${esc(err.message)}</p>`;
+    return;
+  }
+
+  const listEl=document.getElementById("pm_list");
+  if(!plantas.length){
+    listEl.innerHTML=`<p style="text-align:center;color:var(--ink-faint);padding:10px 0">Nenhuma planta pré-definida cadastrada ainda.</p>`;
+    listEl.style.display="block";
+  } else {
+    listEl.style.cssText="";
+    listEl.innerHTML=plantas.map(pl=>`
+      <div class="pm-item" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13px">${esc(pl.nome)}</div>
+        </div>
+        <button class="tbtn" data-use="${esc(pl.id)}">Usar</button>
+        ${isAdmin()?`<button class="tbtn del" data-remove="${esc(pl.id)}" title="Excluir">🗑</button>`:''}
+      </div>`).join('');
+
+    listEl.querySelectorAll("[data-use]").forEach(btn=>{
+      btn.onclick=async()=>{
+        if(state.panels.length && !confirm("Isso vai substituir os painéis, cotas e o quantitativo do projeto atual. Continuar?")) return;
+        btn.disabled=true; btn.textContent="Carregando…";
+        try{
+          const res=await fetch(`${GAS_URL}?token=${encodeURIComponent(tokenAtivoSessao)}&action=carregarPlanta&id=${encodeURIComponent(btn.dataset.use)}`,{cache:"no-store"});
+          const data=await res.json();
+          if(!data.ok) throw new Error(data.erro||"Falha ao carregar planta.");
+          closeModal();
+          loadModelo(data.dados);
+        }catch(err){
+          toastError(err.message); btn.disabled=false; btn.textContent="Usar";
+        }
+      };
+    });
+    listEl.querySelectorAll("[data-remove]").forEach(btn=>{
+      btn.onclick=async()=>{
+        if(!confirm("Excluir esta planta pré-definida? Essa ação não pode ser desfeita.")) return;
+        try{
+          const res=await fetch(GAS_URL,{method:"POST",body:JSON.stringify({token:tokenAtivoSessao,action:"excluirPlanta",id:btn.dataset.remove})});
+          const data=await res.json();
+          if(!data.ok) throw new Error(data.erro||"Falha ao excluir.");
+          toast("Planta excluída.");
+          abrirPlantasModelo();
+        }catch(err){ toastError(err.message); }
+      };
+    });
+  }
+
+  // ── Só o Admin vê o formulário para cadastrar uma nova planta ──────────
+  const saveArea=document.getElementById("pm_save_area");
+  if(isAdmin()){
+    saveArea.innerHTML=`
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+        <div class="field"><label>Salvar planta atual como novo modelo</label>
+          <div style="display:flex;gap:6px">
+            <input id="pm_nome" placeholder="ex: Kitnet 15m² padrão" style="flex:1">
+            <button class="tbtn primary" id="pm_salvar">Salvar</button>
+          </div>
+        </div>
+        <p class="sub" style="margin-top:4px">Salva os painéis, cotas e quantitativo do projeto aberto agora como uma planta pré-definida disponível para todos.</p>
+      </div>`;
+    document.getElementById("pm_salvar").onclick=async()=>{
+      const nome=document.getElementById("pm_nome").value.trim();
+      if(!nome){ toastError("Dê um nome para a planta."); return; }
+      if(!state.panels.length && !confirm("O projeto atual não tem nenhum painel posicionado. Salvar mesmo assim?")) return;
+      const btn=document.getElementById("pm_salvar");
+      btn.disabled=true; btn.textContent="Salvando…";
+      try{
+        const res=await fetch(GAS_URL,{method:"POST",body:JSON.stringify({token:tokenAtivoSessao,action:"salvarPlanta",nome,dados:serializeModelo()})});
+        const data=await res.json();
+        if(!data.ok) throw new Error(data.erro||"Falha ao salvar planta.");
+        toast("Planta salva com sucesso.");
+        abrirPlantasModelo();
+      }catch(err){
+        toastError(err.message); btn.disabled=false; btn.textContent="Salvar";
+      }
+    };
+  }
+}
+
 document.getElementById("btnPdf").onclick=openPdfModal;
 function openPdfModal(){
   const m=state.meta;
@@ -6164,9 +6860,17 @@ function openPdfModal(){
     <div class="field" style="margin-top:10px;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="m_incluir_orc" style="width:auto;margin:0;accent-color:#a7c798;width:14px;height:14px">
-        Incluir orçamento (sem preços unitários) na 2ª página
+        Incluir Quantitativo na 2ª página
       </label>
       <p class="sub" style="margin-top:4px">Adiciona uma página após a planta com a lista de componentes e o valor total do projeto.</p>
+    </div>
+
+    <div class="field" style="margin-top:6px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="m_incluir_valor" ${state.incluirValorNaPlanta!==false?'checked':''} style="width:auto;margin:0;accent-color:#a7c798;width:14px;height:14px">
+        Incluir Valor na Planta
+      </label>
+      <p class="sub" style="margin-top:4px">Mostra o valor total do orçamento no carimbo da planta baixa, entre a logo e "Projetado por".</p>
     </div>
 
     <div class="field" style="margin-top:6px;">
@@ -6203,6 +6907,7 @@ function openPdfModal(){
         revisao:     document.getElementById("m_rev").value.trim() || "01",
         logo: DEFAULT_LOGO
     };
+    state.incluirValorNaPlanta = document.getElementById("m_incluir_valor").checked;
   };
 
   // Cancelar também salva — assim os dados preenchidos não se perdem
@@ -6352,6 +7057,48 @@ function buildSheetSVG(dimMode, incluirLabels = true){
   }
   const dimBB=bboxExcludingMez();
 
+  // ── Bounding boxes (mm) de todas as cotas — calculadas ANTES do
+  // posicionamento dos textos de esquadria, para que o algoritmo de
+  // evitação de colisão (layoutEsqTexts) também desvie das cotas, e não
+  // só dos oitões. São aproximações generosas (não precisam ser pixel-
+  // perfect, só impedir que o texto da esquadria pouse em cima da cota).
+  const pdfCotaBoxes=[];
+  if(dimMode==='auto'){
+    // Cota geral do projeto (desenhada mais abaixo, em torno de dimBB).
+    const _dox1=X(dimBB.x), _dox2=X(dimBB.x+dimBB.w), _doy1=Y(dimBB.y), _doy2=Y(dimBB.y+dimBB.h);
+    const _dimY=_doy1-4.5, _dimX=_dox1-5.5;
+    pdfCotaBoxes.push({x1:_dox1-2, y1:_dimY-4, x2:_dox2+2, y2:_doy1+0.5}); // cota horizontal (topo)
+    pdfCotaBoxes.push({x1:_dimX-4, y1:_doy1-2, x2:_dox1+0.5, y2:_doy2+2}); // cota vertical (esquerda)
+  }
+  if(dimMode==='manual'){
+    // Cotas manuais — mesma geometria usada no desenho mais abaixo.
+    (state.manualDims||[]).forEach(d=>{
+      const{lineP1:q1,lineP2:q2,len}=dimAxisGeom(d.p1,d.p2,d.axis,d.linePos);
+      const _sx1=X(q1[0]),_sy1=Y(q1[1]),_sx2=X(q2[0]),_sy2=Y(q2[1]);
+      const _mx=(_sx1+_sx2)/2,_my=(_sy1+_sy2)/2;
+      const _label=fmt(len)+" m";
+      const _haloW=_label.length*1.9+3;
+      if(d.axis==="x"){
+        pdfCotaBoxes.push({x1:_mx-_haloW/2-1, y1:_my-3, x2:_mx+_haloW/2+1, y2:_my+3});
+      } else {
+        pdfCotaBoxes.push({x1:_mx-3, y1:_my-_haloW/2-1, x2:_mx+3, y2:_my+_haloW/2+1});
+      }
+    });
+  }
+  // Bounding box (mm) de uma cota de ambiente/mezanino (roomDimLine) —
+  // mesma geometria usada no desenho, para reservar o espaço com antecedência.
+  function roomDimBoxMM(eX1,eY1,eX2,eY2,offset,side){
+    if(side==="top"||side==="bottom"){
+      const sign=side==="top"?-1:1;
+      const dimY=eY1+sign*offset;
+      return {x1:Math.min(eX1,eX2)-2, y1:Math.min(dimY,eY1)-3, x2:Math.max(eX1,eX2)+2, y2:Math.max(dimY,eY1)+3};
+    } else {
+      const sign=side==="left"?-1:1;
+      const dimX=eX1+sign*offset;
+      return {x1:Math.min(dimX,eX1)-3, y1:Math.min(eY1,eY2)-2, x2:Math.max(dimX,eX1)+3, y2:Math.max(eY1,eY2)+2};
+    }
+  }
+
   let g=`<rect x="${mLeft}" y="${mTop}" width="${rW}" height="${rH}" fill="none" stroke="#1C1F24" stroke-width="0.5"/>`;
   const pdfEsqTexts=[], pdfOitaoBoxes=[];
   function pathsToPdfSvg(paths,textSink){
@@ -6463,13 +7210,17 @@ function buildSheetSVG(dimMode, incluirLabels = true){
     }
     return s;
   }
+  const panelOitaoDraws=[]; // Fix (PDF): coleta dados de desenho do oitão de piso para 2ª passagem
   state.panels.forEach(p=>{
       const parts=pisoParts(p);
       const ty=typeOf(p.typeId);
       parts.rects.forEach(rc=>{g+=`<rect x="${X(rc.x)}" y="${Y(rc.y)}" width="${rc.w*mmM}" height="${rc.h*mmM}" fill="${rc.fill}" stroke="#1C1F24" stroke-width="0.15"/>`;});
       g+=pathsToPdfSvg(parts.paths,pdfEsqTexts);
   if(parts.name.show&&parts.name.text)g+=`<text x="${X(parts.name.x)}" y="${Y(parts.name.y)+1.2}" font-family="Montserrat, sans-serif" font-size="3.2" font-weight="bold" fill="#1C1F24" text-anchor="middle">${esc(parts.name.text.toUpperCase())}</text>`;
-    // ── Oitão: seta indicativa + nome no PDF ─────────────────────────────
+    // ── Oitão: coleta bounding box + dados de desenho aqui; o desenho em si
+    // (seta + nome) só acontece numa 2ª passagem, depois de TODOS os pisos e
+    // paredes já renderizados — evita que o texto/seta fique escondido sob
+    // um piso vizinho desenhado por cima (mesmo fix já aplicado no canvas).
     if(incluirLabels && p.oitaoAtivo && ty && ty.possuiPossibilidadeOitao){
       let _wxP, _wyP;
       if(ty.hwall){
@@ -6494,12 +7245,7 @@ function buildSheetSVG(dimMode, incluirLabels = true){
         x1:Math.min(ax,apx)-aw/2-0.6, y1:Math.min(ay,apy)-aw/2-0.6,
         x2:Math.max(ax,apx)+aw/2+_nwP+0.6, y2:Math.max(ay,apy)+aw/2+(_nwP>0?2.4:0)+0.6
       });
-      g+=`<polygon points="${apx.toFixed(2)},${apy.toFixed(2)} ${(ax-ony*aw/2).toFixed(2)},${(ay+onx*aw/2).toFixed(2)} ${(ax+ony*aw/2).toFixed(2)},${(ay-onx*aw/2).toFixed(2)}" fill="#1f331b" stroke="#fff" stroke-width="0.15"/>`;
-      if(ty.nomeOitao){
-        // Duplo texto: halo branco primeiro, fill verde-escuro por cima
-        g+=`<text x="${(apx+(-ony)*0.8).toFixed(2)}" y="${(apy+onx*0.8+0.5).toFixed(2)}" font-family="Montserrat, sans-serif" font-size="2.4" font-weight="700" fill="white" stroke="white" stroke-width="0.8" stroke-linejoin="round">${esc(ty.nomeOitao)}</text>`;
-        g+=`<text x="${(apx+(-ony)*0.8).toFixed(2)}" y="${(apy+onx*0.8+0.5).toFixed(2)}" font-family="Montserrat, sans-serif" font-size="2.4" font-weight="700" fill="#1f331b">${esc(ty.nomeOitao)}</text>`;
-      }
+      panelOitaoDraws.push({ax,ay,onx,ony,apx,apy,aw,nomeOitao:ty.nomeOitao});
     }
   });
   if(dimMode==='auto'){
@@ -6511,6 +7257,8 @@ function buildSheetSVG(dimMode, incluirLabels = true){
       const mx1=X(mr.x), mx2=X(mr.x+mr.w), my1=Y(mr.y), my2=Y(mr.y+mr.h);
       g+=roomDimLine(mx1,my1,mx2,my1,2.4,fmt(mr.w)+" m","top");
       g+=roomDimLine(mx1,my1,mx1,my2,2.4,fmt(mr.h)+" m","left");
+      pdfCotaBoxes.push(roomDimBoxMM(mx1,my1,mx2,my1,2.4,"top"));
+      pdfCotaBoxes.push(roomDimBoxMM(mx1,my1,mx1,my2,2.4,"left"));
     });
   }
   state.wallInstances.forEach(inst=>{
@@ -6535,7 +7283,18 @@ function buildSheetSVG(dimMode, incluirLabels = true){
     const _nwP=wtO.nomeOitao?wtO.nomeOitao.length*1.4:0;
     pdfOitaoBoxes.push({x1:ax-aw/2-0.6, y1:ay-ah-(_nwP>0?2.4:0)-0.6, x2:ax+aw/2+_nwP+0.6, y2:ay+0.6});
   });
-  g+=pdfDrawEsqTexts(pdfEsqTexts, pdfOitaoBoxes);
+  g+=pdfDrawEsqTexts(pdfEsqTexts, [...pdfOitaoBoxes, ...pdfCotaBoxes]);
+  // ── Fix (PDF): 2ª passagem — oitões de pisos desenhados por cima de tudo ──
+  panelOitaoDraws.forEach(o=>{
+    const{ax,ay,onx,ony,apx,apy,aw,nomeOitao}=o;
+    g+=`<polygon points="${apx.toFixed(2)},${apy.toFixed(2)} ${(ax-ony*aw/2).toFixed(2)},${(ay+onx*aw/2).toFixed(2)} ${(ax+ony*aw/2).toFixed(2)},${(ay-onx*aw/2).toFixed(2)}" fill="#1f331b" stroke="#fff" stroke-width="0.15"/>`;
+    if(nomeOitao){
+      const tx=(apx+(-ony)*0.8).toFixed(2), ty_=(apy+onx*0.8+0.5).toFixed(2);
+      // Duplo texto: halo branco primeiro, fill verde-escuro por cima
+      g+=`<text x="${tx}" y="${ty_}" font-family="Montserrat, sans-serif" font-size="2.4" font-weight="700" fill="white" stroke="white" stroke-width="0.8" stroke-linejoin="round">${esc(nomeOitao)}</text>`;
+      g+=`<text x="${tx}" y="${ty_}" font-family="Montserrat, sans-serif" font-size="2.4" font-weight="700" fill="#1f331b">${esc(nomeOitao)}</text>`;
+    }
+  });
   // ── Oitão em wallInstances no PDF ──────────────────────────────────────
   state.wallInstances.forEach(wi=>{
     if(!wi.oitaoAtivo) return;
@@ -6556,7 +7315,19 @@ function buildSheetSVG(dimMode, incluirLabels = true){
     }
   });
   } // end if(incluirLabels)
-  state.labels.forEach(l=>{g+=`<text x="${X(l.x)}" y="${Y(l.y)}" font-family="Montserrat, sans-serif" font-size="3.4" font-weight="bold" fill="#1C1F24" text-anchor="middle">${esc(l.text.toUpperCase())}</text>`;});
+  state.labels.forEach(l=>{
+    const lines=(l.text||'').split('\n');
+    const lineH=4;
+    const lx=X(l.x), ly=Y(l.y);
+    // Linha de chamada (âncora), se definida — mesma lógica do canvas
+    if(l.leaderAnchor){
+      const lax=X(l.leaderAnchor.x), lay=Y(l.leaderAnchor.y);
+      g+=`<line x1="${lax.toFixed(2)}" y1="${lay.toFixed(2)}" x2="${lx.toFixed(2)}" y2="${ly.toFixed(2)}" stroke="#7A828C" stroke-width="0.25" stroke-dasharray="1 1"/>`;
+      g+=`<circle cx="${lax.toFixed(2)}" cy="${lay.toFixed(2)}" r="0.7" fill="#7A828C"/>`;
+    }
+    const tspans=lines.map((ln,i)=>`<tspan x="${lx.toFixed(2)}" dy="${i===0?0:lineH}">${esc(ln.toUpperCase())}</tspan>`).join('');
+    g+=`<text x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" font-family="Montserrat, sans-serif" font-size="3.4" font-weight="bold" fill="#1C1F24" text-anchor="middle">${tspans}</text>`;
+  });
 
   if(dimMode==='manual'){
     // Manual cotas: whatever the user created with the dimension tool on the
@@ -6632,6 +7403,25 @@ function buildSheetSVG(dimMode, incluirLabels = true){
     tb += logoPlaceholder;
   }
 
+  // ── Ponto 7: valor do orçamento entre a logo e "Projetado por" ─────────
+  if (state.incluirValorNaPlanta !== false && pricingData) {
+    const itensVB = gerarItensOrcamento();
+    const totalVB = itensVB.reduce((s,i)=>s+(i.subtotal||0),0);
+    if (totalVB > 0) {
+      const descAbsVB = qDesconto.tipo === 'percent'
+        ? totalVB * (qDesconto.valor / 100)
+        : Math.min(qDesconto.valor, totalVB);
+      const valorFinalVB = Math.max(0, totalVB - descAbsVB);
+      const vbX = TX + 55;
+      // Ponto 1: divisórias verticais separando logo | valor | projetado por,
+      // encostando na linha de cima (ty) e de baixo (ty+15) da faixa.
+      tb += `<line x1="${TX+52.5}" y1="${ty}" x2="${TX+52.5}" y2="${ty+15}" stroke="#888" stroke-width="0.3"/>`;
+      tb += `<line x1="${TX+TW-58}" y1="${ty}" x2="${TX+TW-58}" y2="${ty+15}" stroke="#888" stroke-width="0.3"/>`;
+      tb += `<text x="${vbX}" y="${ty+4}" font-family="Montserrat, sans-serif" font-size="2.3" fill="#9099A3">VALOR DO ORÇAMENTO</text>
+        <text x="${vbX}" y="${ty+11.5}" font-family="Montserrat, sans-serif" font-size="4.6" font-weight="bold" fill="#1f331b">R$ ${valorFinalVB.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</text>`;
+    }
+  }
+
   tb+=`<rect x="${TX+TW-58}" y="${ty}" width="58" height="15" fill="none" stroke="#888" stroke-width="0.3"/>
     <text x="${TX+TW-56}" y="${ty+4}" font-family="Montserrat, sans-serif" font-size="2.3" fill="#9099A3">PROJETADO POR</text>
     <text x="${TX+TW-56}" y="${ty+11.5}" font-family="Montserrat, sans-serif" font-size="4.6" font-weight="bold" fill="#1C1F24">${esc((m.projetadoPor||"").toUpperCase())}</text>`;
@@ -6703,19 +7493,17 @@ function injetarAssinaturaPDF(doc) {
 function appendOrcamentoSimplificadoAoPDF(doc) {
   if (!pricingData) return;
 
-  const brlFmt = v => "R$ " + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const itens  = gerarItensOrcamento();
   if (!itens.length) return; // nothing to show
 
-  const total  = itens.reduce((s, i) => s + (i.subtotal || 0), 0);
   const proj   = state.name || "Planta sem título";
 
-  // Recalculate discount (same logic as gerarPDFOrcamento)
-  const descValorAbs = qDesconto.tipo === 'percent'
-    ? total * (qDesconto.valor / 100)
-    : Math.min(qDesconto.valor, total);
-  const valorFinal = Math.max(0, total - descValorAbs);
-  const temDesconto = descValorAbs > 0;
+  // Ponto 6: só entram na lista impressa os insumos marcados como
+  // "Compra com Indústria" — produtos normais sempre aparecem.
+  // Ponto 3: painéis e insumos ficam em tabelas separadas, sem nenhum
+  // valor/preço — o valor do orçamento só aparece na planta (Ponto 7).
+  const paineisVisiveis = itens.filter(it => !it.isInsumo);
+  const insumosVisiveis = itens.filter(it => it.isInsumo && insumoCompraIndustria(it.nome));
 
   doc.addPage();
 
@@ -6745,27 +7533,7 @@ function appendOrcamentoSimplificadoAoPDF(doc) {
   doc.setLineWidth(0.5);
   doc.line(14, 44, 196, 44);
 
-  // ── Tabela: componentes + total (sem preços unitários) ───────────────
-  doc.autoTable({
-    startY: 50,
-    head: [["Produto / Componente", "Qtd."]],
-    body: itens.map(it => [
-      it.nome + (it.isAvulso ? ' ★' : ''),
-      String(it.qtdFinal),
-    ]),
-    foot: (() => {
-      if (temDesconto) {
-        const descLabel = qDesconto.tipo === 'percent'
-          ? `DESCONTO (${qDesconto.valor}%)`
-          : 'DESCONTO';
-        return [
-          ["SUBTOTAL",    total > 0 ? brlFmt(total) : "—"],
-          [descLabel,     brlFmt(descValorAbs)],
-          ["TOTAL FINAL", valorFinal > 0 ? brlFmt(valorFinal) : "—"],
-        ];
-      }
-      return [["TOTAL", total > 0 ? brlFmt(total) : "—"]];
-    })(),
+  const tableStyles = {
     styles: {
       fontSize: 9,
       cellPadding: 4,
@@ -6781,31 +7549,34 @@ function appendOrcamentoSimplificadoAoPDF(doc) {
     alternateRowStyles: {
       fillColor: [250, 252, 249]
     },
-    footStyles: {
-      fillColor: [167, 199, 152],
-      textColor: [31, 51, 27],
-      fontStyle: "bold",
-      fontSize: 10
-    },
-    didParseCell: function(data) {
-      if (data.section === 'foot' && temDesconto) {
-        if (data.row.index === 1) {
-          data.cell.styles.fillColor = [180, 30, 30];
-          data.cell.styles.textColor = [255, 255, 255];
-        }
-        if (data.row.index === 2) {
-          data.cell.styles.fillColor = [31, 51, 27];
-          data.cell.styles.textColor = [255, 255, 255];
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fontSize  = 11;
-        }
-      }
-    },
+    // Larguras fixas (em vez de "auto") para que a divisória entre as
+    // colunas fique alinhada entre as duas tabelas (painéis e insumos).
     columnStyles: {
-      0: { cellWidth: "auto" },
-      1: { halign: "right", minCellWidth: 48 },
+      0: { cellWidth: 134 },
+      1: { halign: "right", cellWidth: 48 },
     },
+  };
+
+  // ── Tabela 1: Painéis / Produtos ──────────────────────────────────────
+  doc.autoTable({
+    startY: 50,
+    head: [["Painéis / Produtos", "Qtd."]],
+    body: paineisVisiveis.length
+      ? paineisVisiveis.map(it => [it.nome + (it.isAvulso ? ' ★' : ''), String(it.qtdFinal)])
+      : [["— nenhum painel —", ""]],
+    ...tableStyles,
   });
+
+  // ── Tabela 2: Insumos complementares (sem título — só a tabela) ────────
+  if (insumosVisiveis.length) {
+    const startY2 = (doc.lastAutoTable?.finalY || 50) + 8;
+    doc.autoTable({
+      startY: startY2,
+      head: [["Insumo", "Qtd."]],
+      body: insumosVisiveis.map(it => [it.nome, String(it.qtdFinal)]),
+      ...tableStyles,
+    });
+  }
 }
 
 async function generatePDF(action = 'save', dimMode = 'auto', incluirOrcamento = false, incluirLabels = true){
@@ -6934,6 +7705,14 @@ function getPriceForType(typeName) {
   return entry ? entry.precoFinal : null;
 }
 
+// ── Lookup de preço por nome de insumo, a partir do catálogo geral ──────
+// (pricingData.insumosCatalog — independe de estar ligado a um painel
+// já presente na planta, permite adicionar insumos "avulsos").
+function getPriceForInsumo(nome) {
+  const entry = (pricingData?.insumosCatalog || []).find(i => i.nome === nome);
+  return entry ? entry.precoFinal : null;
+}
+
 // ── BOM_CONFIG — tradutor de painéis visuais → produtos reais ─────────────
 // Cada chave é o ty.name exato do painel.
 // Cada valor é uma função (panel, ty) → [{nome, qty}]
@@ -6989,6 +7768,13 @@ function avaliarCondicaoBOM(cond, panel) {
 
   // ── Oitão ativo (pisos e paredes) ────────────────────────────────────
   if (cond === "oitao_ativo") return !!panel.oitaoAtivo;
+
+  // ── Condições de ESCADA ─────────────────────────────────────────────
+  if (cond === "escada_com_patamar" || cond === "escada_sem_patamar") {
+    const ty = typeOf(panel.typeId);
+    const temPatamar = !!(ty && ty.patamar);
+    return cond === "escada_com_patamar" ? temPatamar : !temPatamar;
+  }
 
   // ── Condições de PISO ──────────────────────────────────────────────────
   if (cond === "piso_com_quina") {
@@ -7075,6 +7861,30 @@ function gerarRelatorioQuantitativo(panels) {
     }
   });
 
+  // ── Insumos complementares por franquia (Ponto 5) ──────────────────────
+  // Cada insumo é agrupado por NOME apenas (independente de quantos painéis
+  // diferentes o usam) — uma única linha por insumo em toda a planta.
+  const insumoOrigens = {}; // nome do insumo -> Set com os nomes dos painéis que o usam
+  Object.values(acc).slice().forEach(entry => {
+    const relacionados = insumosMap[entry.nome];
+    if (!relacionados || !relacionados.length) return;
+    relacionados.forEach(ins => {
+      const key = `insumo::${ins.nome}`;
+      if (!acc[key]) {
+        acc[key] = { nome: ins.nome, qtd: 0, precoFinal: ins.precoFinal, isInsumo: true };
+        insumoOrigens[ins.nome] = new Set();
+      }
+      acc[key].qtd += entry.qtd * (ins.qty||1);
+      insumoOrigens[ins.nome].add(entry.nome);
+    });
+  });
+  // Ponto 4: soma total de cada insumo arredondada para cima (inteiro mais
+  // próximo acima) — o subtotal é calculado sobre esse valor já arredondado.
+  Object.values(acc).filter(e => e.isInsumo).forEach(e => {
+    e.qtd = Math.ceil(e.qtd);
+    e.origens = Array.from(insumoOrigens[e.nome] || []);
+  });
+
   const prodList = pricingData?.produtos || [];
   return Object.values(acc)
     .map(g => ({
@@ -7083,6 +7893,12 @@ function gerarRelatorioQuantitativo(panels) {
       subtotal: (g.precoFinal || 0) * g.qtd,
     }))
     .sort((a, b) => {
+      // Insumos ficam sempre agrupados ao final da lista, depois de todos
+      // os produtos/painéis; entre si, ordenados alfabeticamente.
+      if (a.isInsumo || b.isInsumo) {
+        if (a.isInsumo && b.isInsumo) return a.nome.localeCompare(b.nome, 'pt-BR');
+        return a.isInsumo ? 1 : -1;
+      }
       const ia = prodList.findIndex(p => p.nome === a.nome);
       const ib = prodList.findIndex(p => p.nome === b.nome);
       return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
@@ -7114,7 +7930,45 @@ function gerarItensOrcamento() {
     });
   });
 
+  // Insumos adicionados manualmente (não vinculados a nenhum painel da planta)
+  qNovosInsumos.forEach(nome => {
+    if (baseNomes.has(nome)) return; // já está no BOM, ajuste vai aparecer lá
+    const delta = qAjustes[nome] || 0;
+    if (delta <= 0) { qNovosInsumos.delete(nome); return; }
+    const precoFinal = getPriceForInsumo(nome) || 0;
+    itens.push({
+      nome, qtd: 0, delta, qtdFinal: delta,
+      precoFinal, temPreco: precoFinal > 0,
+      subtotal: precoFinal * delta, isNovoItem: true,
+      isInsumo: true, origens: [],
+    });
+  });
+
   return itens.filter(i => i.qtdFinal > 0);
+}
+
+// ── Ponto 6: lista de insumos para a aba "Insumos" do Quantitativo.
+// gerarItensOrcamento() já entrega os insumos agrupados por nome (Ponto 4),
+// então aqui só filtramos e ordenamos.
+function gerarInsumosAgregados() {
+  return gerarItensOrcamento()
+    .filter(it => it.isInsumo)
+    .map(it => ({ ...it, origens: it.origens || [] }))
+    .sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+// Um insumo é considerado "Compra com Indústria" (aparece no PDF) por padrão,
+// a menos que tenha sido explicitamente desmarcado.
+function insumoCompraIndustria(nome) {
+  return state.insumoCompraIndustria?.[nome] !== false;
+}
+function qToggleCompraIndustria(nome, checked) {
+  state.insumoCompraIndustria = state.insumoCompraIndustria || {};
+  state.insumoCompraIndustria[nome] = checked;
+}
+function qSetViewTab(tab) {
+  qViewTab = tab;
+  abrirQuantitativo();
 }
 
 // ── Abre o modal de quantitativo ─────────────────────────────
@@ -7124,8 +7978,16 @@ function abrirQuantitativo() {
     return;
   }
 
+  // Preserva a posição do scroll ao reabrir o modal (ex: depois de clicar em
+  // +/− numa quantidade) — sem isso a tela voltava pro topo a cada clique.
+  const _prevScrollModal = modalBody.scrollTop;
+  const _prevScrollTable = document.querySelector('.q-table-wrap')?.scrollTop || 0;
+
   const itens      = gerarItensOrcamento();
-  const semPreco   = itens.filter(i => !i.temPreco && !i.isNovoItem);
+  // Aba "Painéis" só deve exibir itens que não são insumos — insumos ficam
+  // exclusivamente na aba "Insumos" (tabela agrupada própria mais abaixo).
+  const itensPaineis = itens.filter(it => !it.isInsumo);
+  const semPreco   = itensPaineis.filter(i => !i.temPreco && !i.isNovoItem);
   const valorTotal = itens.reduce((s, i) => s + (i.subtotal || 0), 0);
   const totalPaineis = state.panels.length;
   const totalArea    = state.panels.reduce((s,p)=>{ const ty=typeOf(p.typeId); return s+(ty?ty.w*ty.d:0);},0);
@@ -7136,7 +7998,7 @@ function abrirQuantitativo() {
     &nbsp;·&nbsp; ${esc(pricingData.franquia)}
   </span>`;
 
-  const rows = itens.map(it => {
+  const rows = itensPaineis.map(it => {
     const prCell = it.temPreco
       ? `<span class="q-preco-cell">R$ ${brlFmt(it.precoFinal)}</span>`
       : `<span class="q-sem-preco">—</span>`;
@@ -7153,8 +8015,16 @@ function abrirQuantitativo() {
       </span>`;
     const novoLabel = it.isNovoItem
       ? '<div class="q-dims" style="color:var(--accent);font-size:10.5px">adicionado manualmente</div>' : '';
-    return `<tr class="${it.temPreco ? '' : 'q-no-preco-row'}">
-      <td><div class="q-type-name">${esc(it.nome)}</div>${novoLabel}</td>
+    // Ponto 4: insumo complementar — já vem agrupado (uma linha por insumo,
+    // mesmo que usado em vários painéis); mostra em quais painéis é usado.
+    const insumoLabel = it.isInsumo
+      ? `<div class="q-dims" style="font-size:10.5px">usado em: ${(it.origens||[]).map(o=>esc(o)).join(', ')}</div>` : '';
+    const rowClasses = [
+      it.temPreco ? '' : 'q-no-preco-row',
+      it.isInsumo ? 'q-insumo-row' : '',
+    ].filter(Boolean).join(' ');
+    return `<tr class="${rowClasses}">
+      <td><div class="q-type-name" style="${it.isInsumo ? 'padding-left:14px;font-weight:500;font-size:12px;color:var(--ink-soft)' : ''}">${it.isInsumo ? '↳ ' : ''}${esc(it.nome)}</div>${novoLabel}${insumoLabel}</td>
       <td class="num"><span class="q-qty-final">${it.qtdFinal}</span>${adjBtns}</td>
       <td class="num">${prCell}</td>
       <td class="num">${stCell}</td>
@@ -7212,6 +8082,58 @@ function abrirQuantitativo() {
   const confBtn = (pricingData.podeEditar)
     ? `<button class="tbtn q-conf-btn" onclick="abrirConfigMargens()" title="Configurações de margens">⚙</button>`
     : '';
+  const insumosBtn = (pricingData.podeEditar)
+    ? `<button class="tbtn q-conf-btn" onclick="abrirConfigInsumos()" title="Configurar custos de insumos complementares">🧩</button>`
+    : '';
+
+  // ── Ponto 6: aba "Insumos" — lista agrupada com checkbox "Compra com Indústria"
+  const insumosAgg = gerarInsumosAgregados();
+  const insumosRows = insumosAgg.map(ins => {
+    const checked = insumoCompraIndustria(ins.nome);
+    const nomeAttr = esc(ins.nome).replace(/"/g,'&quot;');
+    const insDeltaStr = ins.delta !== 0
+      ? `<span class="q-delta">${ins.delta > 0 ? '+' : ''}${ins.delta}</span>` : '';
+    const insAdjBtns = `<span class="q-adj">
+        <button onclick="qAjustarQtd('${ins.nome.replace(/'/g,"\\'")}', -1)" title="−1">−</button>
+        ${insDeltaStr}
+        <button onclick="qAjustarQtd('${ins.nome.replace(/'/g,"\\'")}', +1)" title="+1">+</button>
+      </span>`;
+    const insOrigemLabel = ins.origens.length
+      ? `<div class="q-dims" style="font-size:10.5px">usado em: ${ins.origens.map(o=>esc(o)).join(', ')}</div>`
+      : `<div class="q-dims" style="color:var(--accent);font-size:10.5px">adicionado manualmente</div>`;
+    return `<tr>
+      <td class="num" style="text-align:center">
+        <input type="checkbox" ${checked?'checked':''} title="Compra com Indústria — aparece no PDF"
+          onchange="qToggleCompraIndustria('${nomeAttr}', this.checked)">
+      </td>
+      <td>
+        <div class="q-type-name">${esc(ins.nome)}</div>
+        ${insOrigemLabel}
+      </td>
+      <td class="num"><span class="q-qty-final">${ins.qtdFinal}</span>${insAdjBtns}</td>
+      <td class="num">${ins.precoFinal>0?`R$ ${brlFmt(ins.precoFinal)}`:`<span class="q-sem-preco">—</span>`}</td>
+      <td class="num"><b>R$ ${brlFmt(ins.subtotal)}</b></td>
+    </tr>`;
+  }).join('');
+
+  // Avulso de insumos — adiciona insumos do catálogo geral da franquia que
+  // ainda não estão presentes na planta (não vinculados a nenhum painel).
+  const insumoOpts = (pricingData?.insumosCatalog||[]).map(i=>`<option value="${esc(i.nome)}">${esc(i.nome)}</option>`).join('');
+  const avulsoInsumoSection = insumoOpts ? `
+    <div class="q-avulso-section">
+      <div class="q-avulso-title">➕ Adicionar insumo</div>
+      <div class="q-avulso-row">
+        <select id="q_avulso_insumo">${insumoOpts}</select>
+        <input type="number" id="q_avulso_insumo_qty" value="1" min="1" step="1" style="width:60px">
+        <button class="tbtn" onclick="qAdicionarInsumoAvulso()">Adicionar</button>
+      </div>
+    </div>` : '';
+
+  const viewTabsHtml = `
+    <div class="q-viewtabs">
+      <button class="q-viewtab ${qViewTab==='paineis'?'on':''}" onclick="qSetViewTab('paineis')">📦 Painéis</button>
+      <button class="q-viewtab ${qViewTab==='insumos'?'on':''}" onclick="qSetViewTab('insumos')">🧩 Insumos${insumosAgg.length?` (${insumosAgg.length})`:''}</button>
+    </div>`;
 
   modalBody.classList.add('q-wide');
   modalBody.innerHTML = `
@@ -7225,7 +8147,27 @@ function abrirQuantitativo() {
           <span><b>${fmt(totalArea)} m²</b></span>
           ${semPreco.length ? `<span style="color:#c62828"><b>${semPreco.length}</b> sem preço</span>` : ''}
         </div>
+        ${viewTabsHtml}
       </div>
+      ${qViewTab==='insumos' ? `
+        ${insumosRows ? `
+          <div class="q-table-wrap">
+            <table class="q-table">
+              <thead><tr>
+                <th style="text-align:center">Compra c/ Indústria</th>
+                <th>Insumo</th>
+                <th class="num">Qtd.</th>
+                <th class="num">Custo Unit.</th>
+                <th class="num">Subtotal</th>
+              </tr></thead>
+              <tbody>${insumosRows}</tbody>
+            </table>
+          </div>
+          <p class="sub" style="margin:6px 0 0;flex-shrink:0">Insumos desmarcados não aparecem no PDF, mas continuam somando no valor total do orçamento.</p>
+          ${totalBlock}
+        ` : `<p style="text-align:center;color:var(--ink-faint);padding:40px 0">Nenhum insumo complementar cadastrado para os painéis desta planta.</p>`}
+        ${avulsoInsumoSection}
+      ` : `
       ${rows ? `
         <div class="q-table-wrap">
           <table class="q-table">
@@ -7241,8 +8183,10 @@ function abrirQuantitativo() {
         ${warn}${totalBlock}
       ` : `<p style="text-align:center;color:var(--ink-faint);padding:40px 0">Nenhum painel na planta ainda.</p>`}
       ${avulsoSection}
-      <div class="modal-actions" style="position:sticky;bottom:0;background:var(--surface);padding-top:12px;margin-top:4px;z-index:2">
+      `}
+      <div class="modal-actions" style="background:var(--surface);padding-top:12px;margin-top:4px;border-top:1px solid var(--line);flex-shrink:0">
         ${confBtn}
+        ${insumosBtn}
         <button class="tbtn" onclick="qLimparAjustes()">Limpar ajustes</button>
         <button class="tbtn" onclick="gerarPDFOrcamento('preview')">⤓ Pré-visualizar</button>
         <button class="tbtn" onclick="gerarPDFOrcamento('save')">⤓ PDF</button>
@@ -7251,14 +8195,20 @@ function abrirQuantitativo() {
     </div>`;
 
   document.getElementById("scrim").classList.add("show");
+
+  // Restaura a posição do scroll capturada no início da função.
+  modalBody.scrollTop = _prevScrollModal;
+  const _tableWrap = document.querySelector('.q-table-wrap');
+  if (_tableWrap) _tableWrap.scrollTop = _prevScrollTable;
 }
 
 // Ajusta qty de um item e remove item manual zerado
 function qAjustarQtd(nome, delta) {
   qAjustes[nome] = (qAjustes[nome] || 0) + delta;
-  // Se item manual foi zerado, limpa da lista
-  if (qNovosItens.has(nome) && (qAjustes[nome] || 0) <= 0) {
+  // Se item manual (produto ou insumo) foi zerado, limpa da lista
+  if ((qNovosItens.has(nome) || qNovosInsumos.has(nome)) && (qAjustes[nome] || 0) <= 0) {
     qNovosItens.delete(nome);
+    qNovosInsumos.delete(nome);
     delete qAjustes[nome];
   }
   abrirQuantitativo();
@@ -7299,9 +8249,32 @@ function qAdicionarAvulso() {
   abrirQuantitativo();
 }
 
+// Adiciona insumo avulso (não vinculado a nenhum painel da planta), com a
+// mesma mesclagem inteligente do qAdicionarAvulso (produtos).
+function qAdicionarInsumoAvulso() {
+  const sel = document.getElementById('q_avulso_insumo');
+  const qty = Math.max(1, parseInt(document.getElementById('q_avulso_insumo_qty')?.value, 10) || 1);
+  if (!sel || !sel.value) return;
+  const nome = sel.value;
+
+  const base = gerarRelatorioQuantitativo(state.panels);
+  const existeNoBOM  = base.some(b => b.nome === nome);
+  const existeManual = qNovosInsumos.has(nome);
+
+  if (existeNoBOM || existeManual) {
+    // Mescla: adiciona ao ajuste da linha já existente
+    qAjustes[nome] = (qAjustes[nome] || 0) + qty;
+  } else {
+    // Novo insumo: rastreia e define qty inicial
+    qNovosInsumos.add(nome);
+    qAjustes[nome] = (qAjustes[nome] || 0) + qty;
+  }
+  abrirQuantitativo();
+}
+
 // Zera todos os ajustes e itens manuais
 function qLimparAjustes() {
-  qAjustes = {}; qNovosItens = new Set();
+  qAjustes = {}; qNovosItens = new Set(); qNovosInsumos = new Set();
   qDesconto = { tipo: 'percent', valor: 0 };
   abrirQuantitativo();
 }
@@ -7435,6 +8408,134 @@ function mostrarEditorMargens() {
   };
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// CONFIGURAR INSUMOS — Gestor/Admin ajustam o custo de cada insumo
+// complementar para a própria franquia (Ponto 5)
+// ════════════════════════════════════════════════════════════════════════
+
+// Abre o modal isolado de configuração de insumos (apenas para Gestor/Admin)
+function abrirConfigInsumos() {
+  if (!pricingData?.podeEditar) return;
+  const overlay = document.getElementById('gestorOverlay');
+  const body    = document.getElementById('gestorModalBody');
+
+  // ── Passo 1: tela de confirmação (mesmo padrão da tela de margens) ──────
+  body.innerHTML = `
+    <div class="gc-confirm">
+      <span class="gc-warn-icon">🧩</span>
+      <h3>Editar custos de insumos?</h3>
+      <p>Você está prestes a visualizar e alterar<br>os custos de insumos complementares desta franquia.</p>
+      <div class="gc-btns">
+        <button class="gc-btn-nao" id="gci_nao">Não, voltar</button>
+        <button class="gc-btn-sim" id="gci_sim">Sim, continuar</button>
+      </div>
+    </div>`;
+
+  document.getElementById('gci_nao').onclick = () => overlay.classList.remove('show');
+  document.getElementById('gci_sim').onclick = () => mostrarEditorInsumos();
+
+  overlay.classList.add('show');
+  overlay.onclick = e => { if (e.target === overlay) overlay.classList.remove('show'); };
+}
+
+// ── Passo 2: editor de insumos (abre só após confirmação) ─────────────────
+function mostrarEditorInsumos() {
+  const overlay  = document.getElementById('gestorOverlay');
+  const catalogo = pricingData?.insumosCatalog || [];
+  const brlFmt   = v => Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  const rows = catalogo.length ? catalogo.map((ins,i) => `
+    <tr>
+      <td><div class="q-type-name">${esc(ins.nome)}</div></td>
+      <td class="num">
+        <div style="display:flex;align-items:center;gap:3px;justify-content:flex-end">
+          <span style="font-size:11px;color:var(--ink-faint)">R$</span>
+          <input class="q-gp-input" data-insumo-i="${i}" type="number" min="0" step="0.01"
+            value="${ins.custoBase>0?ins.custoBase.toFixed(2):''}" placeholder="0,00" style="width:84px">
+        </div>
+      </td>
+      <td class="num" style="color:var(--ink-soft)">R$ ${brlFmt(ins.precoFinal)}</td>
+    </tr>`).join('') : '';
+
+  document.getElementById('gestorModalBody').innerHTML = `
+    <h3 style="margin:0 0 6px;text-align:center;font-size:15px">🧩 Custos de Insumos — ${esc(pricingData.franquia)}</h3>
+    <p class="sub" style="text-align:center;margin:0 0 14px">Custo base por insumo. O preço de venda é calculado automaticamente com as mesmas margens/alíquotas dos produtos.</p>
+    ${rows ? `
+      <div class="q-table-wrap" style="max-height:340px">
+        <table class="q-table">
+          <thead><tr>
+            <th>Insumo</th>
+            <th class="num">Custo Base</th>
+            <th class="num">Preço de Venda</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    ` : `<p style="text-align:center;color:var(--ink-faint);padding:30px 0">
+        Nenhum insumo cadastrado ainda.<br>
+        <span style="font-size:11px">Cadastre pares Painel/Insumo na aba "Insumos por Painel" da planilha.</span>
+      </p>`}
+    <div class="q-gp-status" id="gci_status" style="margin:12px 0 4px;min-height:16px;font-size:12px;text-align:center"></div>
+    <div class="modal-actions">
+      <button class="tbtn" onclick="document.getElementById('gestorOverlay').classList.remove('show')">Cancelar</button>
+      ${rows ? `<button class="tbtn primary" id="gci_salvar">Salvar Custos</button>` : ''}
+    </div>`;
+
+  if (!rows) return;
+
+  document.getElementById('gci_salvar').onclick = async () => {
+    const status = document.getElementById("gci_status");
+    status.textContent = "";
+    const lista = [];
+    let temInvalido = false;
+    document.querySelectorAll('[data-insumo-i]').forEach(inp => {
+      const i = parseInt(inp.dataset.insumoI, 10);
+      const nome = catalogo[i]?.nome;
+      const raw = inp.value.trim();
+      if (raw === "") return; // deixa como está (não sobrescreve com 0 sem intenção)
+      const custo = parseFloat(raw);
+      if (!nome || isNaN(custo) || custo < 0) { temInvalido = true; return; }
+      lista.push({ nome, custo });
+    });
+    if (temInvalido) { status.textContent = "⚠ Há valores inválidos."; status.style.color = "#c62828"; return; }
+    if (!lista.length) { status.textContent = "Nenhuma alteração para salvar."; status.style.color = "var(--ink-faint)"; return; }
+
+    const btn = document.getElementById("gci_salvar");
+    btn.disabled=true; btn.textContent="Salvando…";
+    const token = tokenAtivoSessao;
+    if (!token) { status.textContent = "⚠ Erro: Token de autenticação não encontrado."; status.style.color = "#c62828"; return; }
+    let res;
+    try {
+      const url = `${GAS_URL}?token=${encodeURIComponent(token)}&action=salvarInsumos&insumos=${encodeURIComponent(JSON.stringify(lista))}`;
+      res = await fetch(url, { cache: 'no-store' });
+    } catch(fetchErr) {
+      status.textContent = `⚠ Erro de rede: ${fetchErr.message}`;
+      status.style.color = "#c62828";
+      btn.disabled=false; btn.textContent="Salvar Custos";
+      return;
+    }
+    try {
+      const data = await res.json();
+      if(data.ok){
+        status.textContent="✓ Salvo! Atualizando valores…"; status.style.color="#2e7d32";
+        await recarregarPrecos();
+        mostrarEditorInsumos(); // redesenha com os valores atualizados do servidor
+      } else {
+        status.textContent = `⚠ ${data.erro||"Erro ao salvar."}`;
+        status.style.color = "#c62828";
+        btn.disabled=false; btn.textContent="Salvar Custos";
+      }
+    } catch(jsonErr) {
+      let rawText = "(sem corpo na resposta)";
+      try { rawText = await res.text(); } catch(_){}
+      const preview = rawText.replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim().slice(0,200);
+      status.innerHTML = `⚠ Resposta não-JSON (HTTP ${res.status}):<br><small style="font-family:monospace;word-break:break-all">${preview}</small>`;
+      status.style.color = "#c62828";
+      btn.disabled=false; btn.textContent="Salvar Custos";
+    }
+  };
+}
+
 // ── Autenticação via Token na URL ─────────────────────────────
 async function autenticarECarregar() {
   const overlay  = document.getElementById("authOverlay");
@@ -7475,6 +8576,9 @@ async function autenticarECarregar() {
     document.getElementById("userPerfilBadge").textContent = `${icon} ${perfil}`;
     document.getElementById("userFranquia").textContent    = franquia;
     document.getElementById("userInfoBar").style.display  = "flex";
+    // Ponto 10: botões de exportar/importar JSON completo (estrutura toda,
+    // incluindo cadastro de tipos) só ficam visíveis para o Admin.
+    document.getElementById("jsonAdminBtns").style.display = (perfil === 'Admin') ? 'flex' : 'none';
   };
 
   // ── Núcleo de autenticação ──────────────────────────────────
@@ -7498,9 +8602,7 @@ async function autenticarECarregar() {
       if (fromForm && remember.checked) {
         localStorage.setItem("321modular_token", token);
       }
-      pricingData = data;
-      pricingMap  = {};
-      (data.produtos || []).forEach(p => { pricingMap[p.nome] = p; });
+      aplicarPricingData(data);
       unlockApp();
 
     } catch (err) {
@@ -7542,6 +8644,9 @@ function gerarPDFOrcamento(action = 'save') {
   const itens  = gerarItensOrcamento();
   const total  = itens.reduce((s,i)=>s+(i.subtotal||0),0);
   const proj   = state.name || "Planta sem título";
+  // Ponto 6: só entram na lista impressa os insumos marcados como
+  // "Compra com Indústria" — o total continua somando todos os itens.
+  const itensVisiveis = itens.filter(it => !it.isInsumo || insumoCompraIndustria(it.nome));
 
   // ── Calcular desconto ──────────────────────────────────────
   const descValorAbs = qDesconto.tipo === 'percent'
@@ -7588,29 +8693,25 @@ function gerarPDFOrcamento(action = 'save') {
   doc.setLineWidth(0.5);
   doc.line(14, 54, 196, 54);
 
-  // ── Tabela de itens ────────────────────────────────────────
-  doc.autoTable({
-    startY: 60,
-    head: [["Produto / Componente", "Qtd.", "Preço Unit.", "Subtotal"]],
-    body: itens.map(it => [
-      it.nome + (it.isAvulso ? ' ★' : ''),
-      String(it.qtdFinal),
-      it.temPreco ? brlFmt(it.precoFinal) : "—",
-      it.temPreco ? brlFmt(it.subtotal)   : "—",
-    ]),
-    foot: (() => {
-      if (temDesconto) {
-        const descLabel = qDesconto.tipo === 'percent'
-          ? `DESCONTO (${qDesconto.valor}%)`
-          : 'DESCONTO';
-        return [
-          ["", "", "SUBTOTAL",    total > 0 ? brlFmt(total) : "—"],
-          ["", "", descLabel,     brlFmt(descValorAbs)],
-          ["", "", "TOTAL FINAL", valorFinal > 0 ? brlFmt(valorFinal) : "—"],
-        ];
-      }
-      return [["", "", "TOTAL", total > 0 ? brlFmt(total) : "—"]];
-    })(),
+  // Painéis/produtos e insumos ficam em tabelas separadas no PDF.
+  const paineisVisiveis = itensVisiveis.filter(it => !it.isInsumo);
+  const insumosVisiveis = itensVisiveis.filter(it => it.isInsumo);
+
+  const totaisFoot = (() => {
+    if (temDesconto) {
+      const descLabel = qDesconto.tipo === 'percent'
+        ? `DESCONTO (${qDesconto.valor}%)`
+        : 'DESCONTO';
+      return [
+        ["", "", "SUBTOTAL",    total > 0 ? brlFmt(total) : "—"],
+        ["", "", descLabel,     brlFmt(descValorAbs)],
+        ["", "", "TOTAL FINAL", valorFinal > 0 ? brlFmt(valorFinal) : "—"],
+      ];
+    }
+    return [["", "", "TOTAL", total > 0 ? brlFmt(total) : "—"]];
+  })();
+
+  const tableBaseOpts = {
     styles: { 
         fontSize: 9, 
         cellPadding: 4, 
@@ -7654,25 +8755,40 @@ function gerarPDFOrcamento(action = 'save') {
       2: { halign: "right",  minCellWidth: 44 },
       3: { halign: "right",  minCellWidth: 44 },
     },
+  };
+
+  // ── Tabela 1: Painéis / Produtos ──────────────────────────────────────
+  doc.autoTable({
+    startY: 60,
+    head: [["Painéis / Produtos", "Qtd.", "Preço Unit.", "Subtotal"]],
+    body: paineisVisiveis.length
+      ? paineisVisiveis.map(it => [
+          it.nome + (it.isAvulso ? ' ★' : ''),
+          String(it.qtdFinal),
+          it.temPreco ? brlFmt(it.precoFinal) : "—",
+          it.temPreco ? brlFmt(it.subtotal)   : "—",
+        ])
+      : [["— nenhum painel —", "", "", ""]],
+    // Só recebe o rodapé de totais aqui se não houver insumos a seguir.
+    ...(insumosVisiveis.length ? {} : { foot: totaisFoot }),
+    ...tableBaseOpts,
   });
 
-  // ── Área de assinatura ─────────────────────────────────────
-  const finalY = doc.lastAutoTable.finalY + 25;
-  
-  doc.setDrawColor(167, 199, 152); // #a7c798
-  doc.setLineWidth(0.5);
-  doc.line(14, finalY - 10, 196, finalY - 10);
-
-  doc.setFontSize(10);
-  doc.setTextColor(32, 32, 32); // #202020
-  doc.text("_____________________________________________", 14, finalY);
-  doc.setFont("helvetica", "bold");
-  doc.text("Assinatura do Cliente", 14, finalY + 6);
-  doc.setFontSize(9); 
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(98, 136, 82); // #628852
-  doc.text("Li e concordo com os valores acima.", 14, finalY + 12);
-  doc.setTextColor(0);
+  // ── Tabela 2: Insumos complementares ────────────────────────────────────
+  if (insumosVisiveis.length) {
+    doc.autoTable({
+      startY: (doc.lastAutoTable?.finalY || 60) + 8,
+      head: [["Insumos complementares", "Qtd.", "Preço Unit.", "Subtotal"]],
+      body: insumosVisiveis.map(it => [
+        it.nome,
+        String(it.qtdFinal),
+        it.temPreco ? brlFmt(it.precoFinal) : "—",
+        it.temPreco ? brlFmt(it.subtotal)   : "—",
+      ]),
+      foot: totaisFoot,
+      ...tableBaseOpts,
+    });
+  }
 
   const fname = `orcamento-${proj.replace(/\s+/g,"-").toLowerCase()}`;
   if (action === 'preview') {
@@ -7685,7 +8801,7 @@ function gerarPDFOrcamento(action = 'save') {
 }
 
 // Wire the button
-document.getElementById("btnQuant").addEventListener("click", abrirQuantitativo);
+document.getElementById("btnQuant").addEventListener("click", ()=>{ qViewTab='paineis'; abrirQuantitativo(); });
 // Botão Sair: apaga token salvo e recarrega a página para voltar ao login
 document.getElementById("btnLogout").addEventListener("click", () => {
   localStorage.removeItem("321modular_token");
